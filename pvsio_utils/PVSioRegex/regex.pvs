@@ -1,3 +1,9 @@
+%% This implementation mostly follows Regular Expression Matching Can Be Simple And Fast
+%% (but is slow in Java, Perl, PHP, Python, Ruby, ...) by Russ Cox
+%% https://swtch.com/~rsc/regexp/regexp1.html
+%% The matching algorithm defined here is non-capturing, i.e., it matches longest/shortest substring
+%% that is recognized by a given regular expression from a given initial position. The longest substring
+%% is the greedy match and the shortest is the non-greedy one.
 
 regex : THEORY
 BEGIN
@@ -22,8 +28,10 @@ BEGIN
       (ndfa,null)
     ELSE
       LET initial = car(initials),
-          (new_ndfa1,new_parents1) = connect_parent_initial(ndfa,parent,initial),
-  	  (new_ndfa2,new_parents2) = connect_parent_initials(new_ndfa1,parent,cdr(initials)) IN
+          (new_ndfa1,new_parents1)
+	          = connect_parent_initial(ndfa,parent,initial),
+	  (new_ndfa2,new_parents2)
+	          = connect_parent_initials(new_ndfa1,parent,cdr(initials)) IN
         (new_ndfa2,union_sl(new_parents1,new_parents2))
     ENDIF
     MEASURE initials BY <<
@@ -35,8 +43,10 @@ BEGIN
       (ndfa,parents)
     ELSE
       LET parent = car(parents),
-          (new_ndfa1,new_parents1) = connect_parent_initials(ndfa,parent,initials),
-          (new_ndfa2,new_parents2) = connect_parents_initials(new_ndfa1,cdr(parents),initials) IN
+          (new_ndfa1,new_parents1)
+	         = connect_parent_initials(ndfa,parent,initials),
+          (new_ndfa2,new_parents2)
+	         = connect_parents_initials(new_ndfa1,cdr(parents),initials) IN
   	(new_ndfa2,union_sl(new_parents1,new_parents2))
     ENDIF
   MEASURE parents BY <<
@@ -146,71 +156,91 @@ BEGIN
     f(rgx)
 
   Position : TYPE = [#
-    npos   : nat,  % Next position
-    nlin   : nat,  % Number of lines
-    ncol   : nat   % Number of columns in this line
+    nxt_pos : nat,           % Next position
+    num_lin : upto(nxt_pos), % Number of LF characters (useful to report line number)
+    pos_lin : upto(nxt_pos)  % Position of last LF character (useful to report column number)
   #]
 
   init_pos: Position = (#
-    npos := 0,
-    nlin := 0,
-    ncol := 0
+    nxt_pos := 0,
+    num_lin := 0,
+    pos_lin := 0
   #)
 
-  valid_pos?(str:string)(p:Position) : MACRO bool =
-    p`npos <= length(str)
+  valid_pos?(pn:nat)(pos:Position) : MACRO bool =
+    pos`nxt_pos <= pn
 
-  next_pos(p:Position,c:char) : Position =
-    LET nl = (c=char_newline) IN
-    p WITH [
-      npos := p`npos+1,
-      nlin := IF nl THEN p`nlin+1 ELSE p`nlin ENDIF,
-      ncol := IF nl THEN 0 ELSE p`ncol+1 ENDIF
-    ]
+  next_pos(pos:Position,c:char) : {new_pos:Position | new_pos`nxt_pos = pos`nxt_pos+1} =
+    LET nl      = (c=char_newline),
+        new_pos = pos WITH [
+          `nxt_pos := pos`nxt_pos+1
+	] IN
+    IF nl THEN new_pos WITH [
+      num_lin := new_pos`num_lin+1,
+      pos_lin := new_pos`nxt_pos
+    ] ELSE
+      new_pos
+    ENDIF
 
-  MatchResult_ : DATATYPE
-  BEGIN
-    % Matching succeded with sub-string [pos0..npos).
-    % The next non-matched character is found at (nlin+1,ncol+1)
-    Success(get_pos:Position) : success?
-    % Matching failed. Position is the maximum progress achieved
-    Fail(get_pos:Position) : fail?
-  END MatchResult_
+  % If success is TRUE then matching succeded with substring [init_pos..nxt_pos).
+  % Otherwise, matching failed and nxt_pos delimits the substring with maximum progress
+  MatchResult_ : TYPE = [#
+    success : boolean,
+    pos     : Position
+  #]
 
-  valid_result?(str:string)(result:MatchResult_) : MACRO bool =
-    valid_pos?(str)(get_pos(result))
+  mk_result(success:boolean,pos:Position) : MatchResult_ = (#
+    success := success,
+    pos    := pos
+  #)
 
-  MatchResult(str:string) : TYPE = (valid_result?(str))
+  MatchSuccess(pos:Position) : MatchResult_ =
+    mk_result(TRUE,pos)
 
-  match_pos_(rgx:CompiledRegex,    % Regular expression
-             str:string,           % String to check
-             p:(valid_pos?(str)),  % Next position to check
-             states:list[nat],     % Current initial states
-	     matched_pos: Maybe[(valid_pos?(str))]) % Current successful matching position
-    : RECURSIVE MatchResult(str) =
-    IF p`npos=length(str) THEN
-      IF some?(matched_pos) THEN Success(val(matched_pos)) ELSE Fail(p) ENDIF
+  MatchFailure(pos:Position) : MatchResult_ =
+    mk_result(FALSE,pos)
+
+  valid_result?(pn:nat)(result:MatchResult_) : MACRO bool =
+    valid_pos?(pn)(pos(result))
+
+  MatchResult(pn:nat) : TYPE = (valid_result?(pn))
+
+  % Return position of the longest/shortest substring of str (starting at p) that matches rgx.
+  match_pos_(rgx:CompiledRegex,               % Regular expression
+             str:string,                      % String to check
+             pos:(valid_pos?(length(str))), % Next position to check
+             states:list[nat],                % Current initial states
+	     matched_pos: Maybe[(valid_pos?(length(str)))]) % Current successful matching position
+    : RECURSIVE MatchResult(length(str)) =
+    IF pos`nxt_pos=length(str) THEN
+      IF some?(matched_pos) THEN MatchSuccess(val(matched_pos))
+      ELSE MatchFailure(pos) ENDIF
     ELSE 
-      LET  next_char   = get(str,p`npos),
+      LET  next_char   = get(str,pos`nxt_pos),
            next_states = next(rgx`ndfa,states)(next_char) IN
         IF null?(next_states) THEN
-	  IF some?(matched_pos) THEN Success(val(matched_pos)) ELSE Fail(p) ENDIF
+	  IF some?(matched_pos) THEN MatchSuccess(val(matched_pos))
+	  ELSE MatchFailure(pos) ENDIF
 	ELSE
 	  LET success  = member(FinalState,next_states),
-	      next_pos = next_pos(p,next_char) IN
+	      next_pos = next_pos(pos,next_char) IN
 	  IF NOT greedy(rgx) AND success THEN
-	    Success(next_pos)
+	    MatchSuccess(next_pos)
 	  ELSE
 	    match_pos_(rgx,str,next_pos,next_states,
 	               IF success THEN Some(next_pos) ELSE matched_pos ENDIF)
 	  ENDIF
 	ENDIF
     ENDIF
-    MEASURE length(str)-p`npos
+    MEASURE length(str)-pos`nxt_pos
 
-  % Return position pos such that sub-string[init_pos,pos-1] matches given regex
-  % (or None if string doesn't match regex)
-  match_pos(rgx:CompiledRegex,str:string,pos0:(valid_pos?(str))) : MatchResult(str) =
+  % Return MatchSucesso with the position of the longest/shortest substring of str (starting at pos0)
+  % that is recognized by regex. Longest/shortest depends on wether the regex is set to be greedy
+  % (longest) or non-greedy (shortest).
+  % If no substring starting from pos0 matches regex, return a MatchFailure and the position of the
+  % substring starting at pos0 that made the most progress.
+  match_pos(rgx:CompiledRegex,str:string,pos0:(valid_pos?(length(str))))
+    : MatchResult(length(str)) =
     LET init_states  = rgx`ndfa`initials ,
         init_matched = IF member(FinalState,init_states) THEN
 	                 Some(pos0)
@@ -219,13 +249,34 @@ BEGIN
 		       ENDIF IN
     match_pos_(rgx,str,pos0,init_states,init_matched)
 
-  % Return prefix and postfix xof string, such that prefix matches given regex (or None if
-  % string doesn't match regex)
+  match_pos(rgx:CompiledRegex,str:string) : MatchResult(length(str)) =
+    match_pos(rgx,str,init_pos)
+
+  % Return prefix and postfix of string, such that prefix is the longest/shortest prefix
+  % of given string that is recognized by the regex. Longest/shortest depends on wether the
+  % regex is set to be greedy (longest) or non-greedy (shortest).
+  % Return None if no prefix matches regex
   match(rgx:CompiledRegex,str:string) : Maybe[[string,string]] =
-    CASES match_pos(rgx,str,init_pos) OF
-      Success(p) : (gen_strings.substr(str,0,p`npos),gen_strings.substr(str,p`npos,length(str)))
-      ELSE None
-    ENDCASES
+    LET mpos = match_pos(rgx,str) IN
+    IF mpos`success THEN
+        LET prefx = gen_strings.substr(str,0,mpos`pos`nxt_pos),
+	    posfx = gen_strings.substr(str,mpos`pos`nxt_pos,length(str)) IN
+        (prefx,posfx)
+    ELSE
+      None
+    ENDIF
+
+  % Return prefix and postfix of string, such that prefix is the longest prefix
+  % of given string that is recognized by the regex.
+  % Return None if no prefix matches regex.
+  greedy_match(rgx:CompiledRegex,str:string) : Maybe[[string,string]] =
+    match(set_greediness(TRUE)(rgx),str)
+
+  % Return prefix and postfix of string, such that prefix is the shortest prefix
+  % of given string that is recognized by the regex.
+  % Return None if no prefix matches regex.
+  nongreedy_match(rgx:CompiledRegex,str:string) : Maybe[[string,string]] =
+    match(set_greediness(FALSE)(rgx),str)
 
   CONVERSION compile
 

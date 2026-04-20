@@ -14,7 +14,7 @@ BEGIN
 
   % Non-greedy match
   test_int2 : Maybe[[string,string]] =
-    match(IntegerX <| set_greediness(FALSE),"-12354abc")
+    match(set_greediness(FALSE)(IntegerX),"-12354abc")
 
   % Matches TRUE, case insensitive (see PVSioParser/regex_def)
   test_word : Maybe[[string,string]] =
@@ -30,9 +30,34 @@ BEGIN
   test_alphanum1 : Maybe[[string,string]] =
     match(AlphaNumX,"a123AxC_")
 
-  % The following regex is a corner case for backtracking matches, with exponential performance
+  % /a*aaa/"aa" -> no match
+  test_a2 : Maybe[[string,string]] =
+    match(**('a')+"aaa","aa")
+
+  % /a*aaa/"aaaa" -> "aaaa"
+  test_a4 : Maybe[[string,string]] =
+    match(**('a')+"aaa","aaaa")
+
+  % Examples from   % Examples from Greedy Regular Expression Matching
+  % by Alain Frisch and Luca Cardelly
+  % https://www.cduce.org/papers/greedy.pdf
+
+  % /(εε*)|ε/"aaaaa" –> ""
+  test_aflc1 : Maybe[[string,string]] =
+    match((Empty + **(Empty))//Empty,"aaaa")
+
+  % /(ab|a)*(b+ε)/"ab" –> "ab
+  test_aflc2 : Maybe[[string,string]] =
+    match(**("ab"//'a')+('b'//Empty),"ab")
+
+  % /(a|ab)*(b|ε)/"ab" –> "ab
+  test_aflc3 : Maybe[[string,string]] =
+    match(**('a'//"ab")+('b'//Empty),"ab")
+
+  % The following regex is a corner case for backtracking matches,
+  % with exponential performance
   % ('a'?)^n'a'^n
-  % PVSioParser implements a linear match
+  % PVSioRegex implements a linear match
 
   corner_case(n:nat) : Maybe[[string,string]] =
     match([|'a'|]^^(n) + 'a'^^(n),"a"^n)

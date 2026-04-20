@@ -1,0 +1,53 @@
+json_def : THEORY
+BEGIN
+
+  IMPORTING structures@Maybe,
+            structures@list_lemmas
+
+  injective_dict?[T:TYPE](dict:list[[string, T]]) : bool =
+    FORALL(i:below(length(dict)),j:subrange(i+1,length(dict)-1)):
+      nth(dict,i)`1 /= nth(dict,j)`1
+
+  injective_dict[T:TYPE] : LEMMA
+    FORALL (dict:list[[string,T]]):
+      injective_dict?(dict) IFF
+      FORALL(i,j:below(length(dict))): nth(dict,i)`1 = nth(dict,j)`1 IMPLIES i=j
+
+  injective_null[T:TYPE] : JUDGEMENT
+    null HAS_TYPE (injective_dict?[T])
+
+  % JSON values can be represented as follows.
+  JValue : DATATYPE
+  BEGIN
+    JObject(jobject : (injective_dict?[JValue])) : jobject?
+    JArray(jarray : list[JValue]) : jarray?
+    JNum(jnum : real) : jnum?
+    JStr(jstr : string) : jstr?
+    JBool(jbool : bool) : jbool?
+    JNull : jnull?
+  END JValue
+
+  JDictionary : TYPE = (injective_dict?[JValue])
+
+  % Getters
+
+  jobject_field_value(jobj : (jobject?))(s : string) : Maybe[JValue] =
+    LET l = find(LAMBDA(t:[string,JValue]): t`1 = s,jobject(jobj)) IN
+      IF null?(l) THEN None
+      ELSE car(l)`2
+    ENDIF
+
+  jarray_nth_value(jarr: (jarray?))(i:nat) : Maybe[JValue] =
+    IF i < length(jarray(jarr)) THEN
+      nth(jarray(jarr),i)
+    ELSE
+      None
+    ENDIF
+
+  jdict_add : LEMMA
+      FORALL (jdict:JDictionary,key:string,jval:JValue) :
+        LET l = find(LAMBDA(t:[string,JValue]): t`1 = key,jdict) IN
+	null?(l) IMPLIES 
+        injective_dict?(snoc(jdict,(key,jval)))
+
+END json_def

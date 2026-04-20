@@ -8,25 +8,28 @@ BEGIN
   BEGIN
     Empty                : empty?    % Accept empty input
     Accept(guard:Guard)  : accept?   % Accept only when condition is satisfied
-    Seq(re1,re2:Regex)   : sequence? % Accept re1 and then accept r2
-    Union(re1,re2:Regex) : union?    % Accept re1 or re2
-    Plus(re:Regex)       : plus?     % Accept re one or more times
+    Seq(re1,re2:Regex)   : sequence? % Accept re1 and then accept r2 (r1 + r2)
+    Union(re1,re2:Regex) : union?    % Accept re1 or re2 (r1 // r2)
+    Plus(re:Regex)       : plus?     % Accept re one or more times ++(re)
   END Regex
 
+  % [| re |]
   Optional(re:Regex) : Regex =
     Union(Empty,re)
 
+  % **(re)
   Star(re:Regex) : Regex =
     Optional(Plus(re))
 
+  % reˆˆ(n)
   Pow(n:nat)(re:Regex) : RECURSIVE Regex =
     IF n=0 THEN Empty
     ELSE Seq(re,Pow(n-1)(re))
     ENDIF
   MEASURE n
 
-  % Union regex, e.g., <regex> # <regex>
-  ;/(re1,re2:Regex) : Regex =
+  % Union regex, e.g., <regex> // <regex>
+  ;//(re1,re2:Regex) : Regex =
     Union(re1,re2)
 
   % Optional regex, e.g., [| <regex> |]
@@ -268,7 +271,7 @@ BEGIN
 
   % Natural Number, without leading zeros
   Natural : Regex =
-    '0' / NzNatural
+    '0' // NzNatural
 
   % Natural Number, with leading zeros
   ZNatural : Regex =

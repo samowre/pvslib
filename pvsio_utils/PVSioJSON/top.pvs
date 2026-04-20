@@ -2,7 +2,8 @@
 top : THEORY
 BEGIN
 
-  IMPORTING JSONPeg,
+  IMPORTING json_def,
+            JSONPeg,
             pvsio_json
 
 END top

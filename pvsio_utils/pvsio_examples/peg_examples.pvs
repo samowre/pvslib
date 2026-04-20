@@ -51,7 +51,7 @@ BEGIN
     ast_new(LAMBDA(r:real):-r)
 
   ArithPeg : PEG =
-    new_stdpeg("Expr")
+    newPEG("Expr")
      <| ( "Expr"      <<= "Sum" )
      <| ( "Sum"       <<= ("Product" + **((PegToken("+") / PegToken("-")) + "Product")) o mk_sum )
      <| ( "Product"   <<= ("Value" + **((PegToken("/") / PegToken("*")) + "Value")) o mk_product )

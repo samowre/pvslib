@@ -1,18 +1,8 @@
 JSONPeg : THEORY
 BEGIN
 
-  % JSON values can be represented as follows.
-  JValue : DATATYPE
-  BEGIN
-    JObject(jobject : list[[string, JValue]]) : jobject?
-    JArray(jarray : list[JValue]) : jarray?
-    JNum(jnum : real) : jnum?
-    JStr(jstr : string) : jstr?
-    JBool(jbool : bool) : jbool?
-    JNull : jnull?
-  END JValue
-
-  IMPORTING PVSioPEG@pvsio_peg[JValue]
+  IMPORTING json_def,
+            PVSioPEG@pvsio_peg[JValue]
 
   mk_jbool : ASTBuilder =
     ast_try(ast_literal("true"),
@@ -23,9 +13,9 @@ BEGIN
     JNum(str2real(str))
 
   mk_str : ASTBuilder =
-    ast_new(LAMBDA(str:string):
-      IF length(str) >= 2 THEN
-        JStr(gen_strings.substr(str,1,length(str)-1))
+    ast_new(LAMBDA(quoted_str:string):
+      IF length(quoted_str) >= 2 THEN
+        JStr(gen_strings.substr(quoted_str,1,length(quoted_str)-1))
       ELSE
         NoAST
       ENDIF)
@@ -41,9 +31,16 @@ BEGIN
     ast_this(JArray(null)) +
     ast_repeat(ast_make(add_jvalue))
 
-  add_jobj(key:string)(jobj,jval:JValue) : ASTOutput =
-   IF length(key) >= 2 AND jobject?(jobj) THEN
-     JObject(snoc(jobject(jobj),(gen_strings.substr(key,1,length(key)-1),jval)))
+  add_jobj(token_item:TokenItem)(jobj,jval:JValue) : ASTOutput =
+   LET quoted_key = get_token(token_item) IN
+   IF length(quoted_key) >= 2 AND jobject?(jobj) THEN
+     LET key = gen_strings.substr(quoted_key,1,length(quoted_key)-1),
+         jv  = jobject_field_value(jobj)(key) IN
+     IF none?(jv) THEN
+       JObject(snoc(jobject(jobj),(key,jval)))
+     ELSE
+       Exit("Key already exists",get_loc(token_item))
+     ENDIF
    ELSE
       NoAST
    ENDIF
@@ -53,11 +50,11 @@ BEGIN
     ast_repeat(
       ast_consume + % Don't process the field name yet
       ast_peek(-1,  % Peek the field name now and use it to build the next (key,value) pair
-               LAMBDA (key:string):
-               ast_make(add_jobj(key))))
+               LAMBDA (token_item:TokenItem):
+               ast_make(add_jobj(token_item))))
 
   JSONPeg : PEG =
-    new_stdpeg("JDoc")
+    newPEG("JDoc")
       <| ( "JDoc"    <<= "JValue" + **(PegWhiteLines + "JValue") )
       <| ( "JValue"  <<= "JNum" / "JBool" / "JStr" / "JNull" / "JArray" / "JObject" )
       <| ( "JNum"    <<= PegToken(Float,"Number") o ast_new(str2jnum) )

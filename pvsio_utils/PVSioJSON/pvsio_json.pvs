@@ -1,8 +1,7 @@
 pvsio_json : THEORY
 BEGIN
 
-    IMPORTING structures@list_lemmas,
-              JSONPeg
+    IMPORTING JSONPeg
 
     % Return first JSON object found in string
     json_from_string(str : string) : JValue =
@@ -98,21 +97,6 @@ BEGIN
 
     json_to_file(jval:JValue,filename:string) : void =
       json_to_file(jval,filename,true)
-
-    % Getters
-
-    jobject_field_value (jobj : (jobject?))(s : string) : Maybe[JValue] =
-      LET l = find(LAMBDA(t:[string,JValue]): t`1 = s,jobject(jobj)) IN
-        IF null?(l) THEN None
-	ELSE car(l)`2
-	ENDIF
-
-    jarray_nth_value(jarr: (jarray?))(i:nat) : Maybe[JValue] =
-      IF i < length(jarray(jarr)) THEN
-        nth(jarray(jarr),i)
-      ELSE
-        None
-      ENDIF
 
     JgetException : SimpleException = "JgetException"
 

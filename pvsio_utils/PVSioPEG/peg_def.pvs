@@ -7,6 +7,9 @@ BEGIN
 
   IMPORTING PVSioRegex@regex
 
+  % Disables conversion from strings into Regex
+  CONVERSION- Word
+
   Rule : TYPE = string
 
   % Rule and position
@@ -87,7 +90,7 @@ BEGIN
   BEGIN
     Aborted(get_msg:string,get_loc:Location) : aborted?
     Success(get_asts:list[AST]) : success?
-    Fail(get_failed_items:list[FailedItem]) : fail?
+    Failure(get_failed_items:list[FailedItem]) : failure?
   END PegStatus
 
   % Item is either a terminal token or an AST
@@ -104,9 +107,34 @@ BEGIN
   
   ASTItem   : TYPE = (ast_item?)
 
-  ASTTier    : TYPE = finseq[Item]
+  % Working level for construction of AST
+  ASTTier   : TYPE = [#
+    scope : Scope,       % Scoping rule
+    pos   : Position,    % Position in string
+    items : finseq[Item] % Sequence of items used for AST construction
+  #]
 
   ASTScaffold : TYPE = list[ASTTier]
+
+  same_scope?(scope1,scope2:Scope): MACRO bool =
+    scope1`rule = scope2`rule AND
+    scope1`pos`nxt_pos = scope2`pos`nxt_pos
+
+  sorted_scopes?(scopes:list[Scope]) : bool =
+    FORALL (i:below(length(scopes)),j:subrange(i+1,length(scopes)-1)):
+      nth(scopes,i)`pos`nxt_pos >= nth(scopes,j)`pos`nxt_pos AND
+      NOT same_scope?(nth(scopes,i),nth(scopes,j))
+
+  sorted_scopes : LEMMA
+    FORALL (scopes:list[Scope]) :
+      sorted_scopes?(scopes) IFF
+      FORALL (i,j:below(length(scopes))) :
+        (i <= j IMPLIES nth(scopes,i)`pos`nxt_pos >= nth(scopes,j)`pos`nxt_pos) AND
+	(same_scope?(nth(scopes,i),nth(scopes,j)) IMPLIES i = j)
+
+  sorted_cdr_scopes : LEMMA
+    FORALL (scopes:(sorted_scopes?)):
+       cons?(scopes) IMPLIES sorted_scopes?(cdr(scopes))
 
   PegState : TYPE = [#
     % Parsing status
@@ -117,10 +145,7 @@ BEGIN
     failed_items : list[FailedItem],
     % Last accepted token terminal (none only if position is 0)
     last_token : Maybe[TokenItem],
-    % Current position
-    current_pos : Position,
-    % Scaffold of tiers of items used of AST constructions (tokens and AST). The top level is
-    % the working level
+    % Scaffold of items used of AST constructions (tokens and ASTs)
     scaffold : ASTScaffold
   #]
 
@@ -128,13 +153,32 @@ BEGIN
   BEGIN
     OptAST(get_opt_ast:Maybe[AST]) : opt_ast?
     Exit(get_msg:string,get_opt_loc:Maybe[Location]) : exit?
+    Fail(get_label:PredicateLabel,get_opt_loc:Maybe[Location]) : fail?
   END ASTOutput
 
   Exit(msg:string) : (exit?) = Exit(msg,None)
 
+  Fail(str:string,loc:Location) : (fail?) = Fail(PredicateLabel(str),loc)
+
+  Fail(str:string) : (fail?) = Fail(PredicateLabel(str),None)
+
+  Fail : (fail?) = Fail("")
+
   MkASTFun  : TYPE = [PegState->ASTOutput]
 
   init_scope : Scope = mk_scope("",init_pos)
+
+  current_pos(state:PegState) : Position =
+    IF none?(state`last_token) THEN
+      init_pos
+    ELSE
+      get_loc(val(state`last_token))`end_pos
+    ENDIF
+
+  current_pos_eq : LEMMA
+    FORALL(state1,state2:PegState) :
+      state1`last_token = state2`last_token IMPLIES
+      current_pos(state1) = current_pos(state2)
 
   current_scope(state:PegState) : Scope =
     IF null?(state`scopes) THEN
@@ -145,23 +189,21 @@ BEGIN
 
   current_loc(state:PegState) : Location = (#
     scope     := current_scope(state),
-    start_pos := state`current_pos,
-    end_pos   := state`current_pos
+    start_pos := current_pos(state),
+    end_pos   := current_pos(state)
   #)
 
-  working_tier(state:PegState) : ASTTier =
-    IF null?(state`scaffold) THEN
-      empty_seq
-    ELSE
-      car(state`scaffold)
-    ENDIF
+  new_tier(state:PegState) : ASTTier = (#
+    scope := current_scope(state),
+    pos   := current_pos(state),
+    items := empty_seq
+  #)
 
   init_state : PegState = (#
     status       := Success(null),
     scopes       := null,
     failed_items := null,
     last_token   := None,
-    current_pos  := init_pos,
     scaffold     := null
   #)
 
@@ -169,25 +211,37 @@ BEGIN
   BEGIN
     PegEmpty
       : peg_empty?
+
     % Terminals are compiled regular expressions. They don't reconize the empty string.
     % The label is used for error reporting. The string in the label identifies the regex.
-    % The boolean indicates whether the matched string contributes to the construction of AST.
+    % The boolean indicates whether the matched string contributes to the construction of
+    %AST.
     PegTerminal(get_rgx:CompiledRegex,get_terminal_label:TerminalLabel,get_build:bool)
       : peg_terminal?
+
     PegNonTerminal(get_rule:Rule)
       : peg_nonterminal?
+
+    % pe1 + pe2
     PegSeq(get_pegex1,get_pegex2:PEGex)
       : peg_sequence?
+
+    % pe1 / pe2
     PegChoice(get_pegex1,get_pegex2:PEGex)
       : peg_choice?
+
+    % **(pe)
     PegStar(get_pegex:PEGex)
       : peg_star?
+
     % The label is used for error reporting. The string label indentifies the expected
     % input that avoids failure.
     PegNot(get_pegex:PEGex,get_predicate_label:PredicateLabel)
       : peg_not?
+
     % Actions allow to recursively build an AST per or terminate the parsing.
     % Unless action triggers an exit, PegDo(pegex,action) accepts the same strings as pegex.
+    % (pe) o astf
     PegAST(get_pegex:PEGex,get_astf:MkASTFun)
       : peg_do?
   END PEGex
@@ -204,14 +258,20 @@ BEGIN
   PegTerminal(rgx:CompiledRegex) : PEGex =
     PegTerminal(rgx,NoLabel,FALSE)
 
-  % PegTerminal of untrimmed regular expression, with error reporting (if string is non empty)
-  % and AST building
+  % PegTerminal of untrimmed regular expression, with error reporting
+  % (if string is non empty) and AST building
   PegTerminal(rgx:CompiledRegex,label:string) : PEGex =
     PegTerminal(rgx,TerminalLabel(label),TRUE)
 
   % PegTerminal of untrimmed regular expression, with no error reporting and no AST building
   PegTerminal(rgx:CompiledRegex,label:(silent_label?)) : PEGex =
     PegTerminal(rgx,label,FALSE)
+
+  PegFail(label:PredicateLabel) : PEGex =
+    PegNot(PegEmpty,label)
+
+  PegFail(label:string) : PEGex =
+    PegNot(PegEmpty,PredicateLabel(label))
 
   PegFail : PEGex = PegNot(PegEmpty)
 
@@ -244,6 +304,7 @@ BEGIN
   ;/(pegex1,pegex2:PEGex) : PEGex =
     PegChoice(pegex1,pegex2)
 
+  % Sequence
   ;+(pegex1,pegex2:PEGex) : PEGex =
     PegSeq(pegex1,pegex2)
 
@@ -265,11 +326,11 @@ BEGIN
 
   % Binary syntax predicate "&", with error reporting (if string is non empty)
   PegAnd(pegex1,pegex2:PEGex,label:string) : PEGex =
-    PegWhen(pegex1,label)+PegWhen(pegex2,label)
+    PegWhen(pegex1,label) + PegWhen(pegex2,label)
 
   % Binary syntax predicate "&", with no error reporting
   PegAnd(pegex1,pegex2:PEGex) : PEGex =
-    PegWhen(pegex1)+PegWhen(pegex2)
+    PegWhen(pegex1) + PegWhen(pegex2)
 
   % Binary syntax predicate "||", with error reporting (if string is non empty)
   PegOr(pegex1,pegex2:PEGex,label:string) : PEGex =
@@ -294,47 +355,60 @@ BEGIN
   PegExit(msg:string) : PEGex =
     PegAST(PegEmpty,LAMBDA(state:PegState):Exit(msg,current_loc(state)))
 
-  PEGrammar : TYPE = list[[Rule,PEGex]]
+  peg_injective?(l:list[[Rule,PEGex]]) : bool =
+    FORALL (i:below(length(l)),j:subrange(i+1,length(l)-1)) :
+      nth(l,i)`1 /= nth(l,j)`1
 
-  % A grammar with a start rule
-  PEG : TYPE = [#
-    start : Rule,
-    peg   : PEGrammar
-  #]
+  peg_injective : LEMMA
+    FORALL (l:list[[Rule,PEGex]]) :
+    peg_injective?(l) IFF
+      FORALL (i,j:below(length(l))):
+        nth(l,i)`1 = nth(l,j)`1 IMPLIES i=j
 
-  mk_peg(rule:Rule,grammar:PEGrammar) : PEG = (#
-    start := rule,
-    peg := grammar
-  #)
+  PEG : TYPE = (peg_injective?)
+
+  cdr_peg_injective : LEMMA
+    FORALL (peg:PEG) :
+      cons?(peg) IMPLIES peg_injective?(cdr(peg))
+
+  empty_peg : PEG = null
 
   % These are used in peg_rel and WF definition. They should not be used in actual grammars
   peg_nwf   : PEGex = PegStar(PegEmpty)         % peg_nwf -> 0 and NOT WF
   peg_any   : PEGex = PegTerminal(Empty)        % peg_any -> {1,-1} and WF
   peg_proxy : PEGex = peg_any / PegNot(peg_any) % peg_proxy -> {0,1,-1} and WF
 
-  peg_get_rule(peg:PEGrammar)(rule:Rule) : RECURSIVE PEGex =
+  peg_get_rule(peg:PEG)(rule:Rule) : RECURSIVE PEGex =
     IF null?(peg) THEN peg_nwf
     ELSE LET (r,e) = car(peg) IN
       IF r = rule THEN e
       ELSE peg_get_rule(cdr(peg))(rule)
       ENDIF
     ENDIF
-    MEASURE peg BY <<
+    MEASURE length(peg)
 
   CONVERSION peg_get_rule
 
   % Return either the None or pregex of the rule
-  peg_find_rule(peg:PEGrammar)(rule:Rule) : RECURSIVE Maybe[PEGex] =
+  peg_find_rule(peg:PEG)(rule:Rule) : RECURSIVE
+    { result : Maybe[PEGex] |
+      (some?(result) IMPLIES EXISTS (i:below(length(peg))): nth(peg,i) = (rule,val(result))) AND
+      (none?(result) IMPLIES FORALL (i:below(length(peg))): nth(peg,i)`1 /= rule) } =
     IF null?(peg) THEN None
     ELSE LET (r,e) = car(peg) IN
       IF r = rule THEN Some(e)
       ELSE peg_find_rule(cdr(peg))(rule)
       ENDIF
     ENDIF
-    MEASURE peg BY <<
+    MEASURE length(peg)
 
   % If rule exists, overwrite it
-  peg_add_rule(rule:Rule,pegex:PEGex)(peg:PEGrammar) : RECURSIVE PEGrammar =
+  peg_add_rule(rule:Rule,pegex:PEGex)(peg:PEG) : RECURSIVE
+    {result : PEG | length(peg) <= length(result) <= length(peg)+1 AND
+                    EXISTS (i:below(length(result))): nth(result,i) = (rule,pegex) AND
+		      (length(result) = length(peg)+1 IFF i = length(peg)) AND
+                      (FORALL (k:below(i)): nth(result,k) = nth(peg,k)) AND
+		      (FORALL (k:subrange(i+1,length(peg)-1)): nth(result,k) = nth(peg,k))} =
     IF null?(peg) THEN 
        cons((rule,pegex),peg)
     ELSE
@@ -345,15 +419,13 @@ BEGIN
         cons(car(peg),peg_add_rule(rule,pegex)(cdr(peg)))
       ENDIF
     ENDIF
-    MEASURE peg BY <<
+    MEASURE length(peg)
 
-  peg_add(rule:Rule,pegex:PEGex)(G:PEG) : PEG =
-    G WITH [
-      peg := peg_add_rule(rule,pegex)(peg(G))
-    ]
+  peg_add(rule:Rule,pegex:PEGex)(peg:PEG) : PEG =
+    peg_add_rule(rule,pegex)(peg)
 
-  ;<|(G:PEG,f:[PEG->PEG]) : PEG =
-    f(G)
+  ;<|(peg:PEG,f:[PEG->PEG]) : PEG =
+    f(peg)
 
   ;<<=(rule:Rule,e:PEGex) : [PEG->PEG] =
     peg_add(rule,e)
@@ -371,8 +443,11 @@ BEGIN
   % EOF after left-triming
   PegEOF : PEGex = PegSpacing + PegUnless(PegAny,"EOF")
 
-  peg_skip(pegex:PEGex)(G:PEG) : PEG =
-    G <| ( SkipRule <<= (peg(G)(SkipRule) / pegex) )
+  peg_skip(pegex:PEGex)(peg:PEG) : PEG =
+    peg <| ( SkipRule <<= (peg(SkipRule) / pegex) )
+
+  peg_start(start:string)(peg:PEG) : PEG =
+    peg <| ( StartRule <<= start + PegEOF )
 
   % A PegToken(rgx,label,build) is a trimmed regular expression
   PegToken(rgx:CompiledRegex,label:TerminalLabel,build:bool) : PEGex =
@@ -385,7 +460,7 @@ BEGIN
 
   % A PegToken(literal) is a trimmed string literal, with error reporting and AST building
   PegToken(literal:string) : PEGex =
-     PegToken(compile(literal),LiteralLabel(literal),TRUE)
+     PegToken(Word(literal),LiteralLabel(literal),TRUE)
 
   % A PegTOKEN(literal) is a case insensitive trimmed string literal, with error reporting and
   % AST building
@@ -395,7 +470,7 @@ BEGIN
 
   % A PegLiteral(literal) is a trimmed string literal, with error reporting and no AST building
   PegLiteral(literal:string) : PEGex =
-    PegToken(compile(literal),LiteralLabel(literal),FALSE)
+    PegToken(Word(literal),LiteralLabel(literal),FALSE)
 
   % A PegLITERAL(literal) is a case insensitive trimmed literal world, with error reporting,
   % and no AST building
@@ -403,20 +478,17 @@ BEGIN
     LET label = sensitive_label(FALSE)(literal) IN
     PegToken(compile(WORD(literal)),LiteralLabel(label),FALSE)
 
-  % Make a new PEG no pre-defined grammar rules
-  new_peg(start:Rule) : PEG = mk_peg(start,null)
-
   % Make a new PEG with pre-defined start rule and a configurable skip rule, which by default skips
   % white spaces, tabs, and newlines 
-  new_stdpeg(start:Rule) : PEG =
-    new_peg(start)
-      <| ( StartRule <<= start + PegEOF )
-      <| ( SkipRule     <<= PegWhiteSpaces )
+  newPEG(start:Rule) : PEG =
+    empty_peg
+      <| peg_start(start)
+      <| ( SkipRule  <<= PegWhiteSpaces )
 
   IMPORTING reals@sign3
 
   % Defines relation ->G in Section 3.5 [1], where -1 encodes f
-  peg_rel(peg:PEGrammar)(pegex:PEGex,n:Sign3) : INDUCTIVE bool =
+  peg_rel(peg:PEG)(pegex:PEGex,n:Sign3) : INDUCTIVE bool =
     CASES pegex OF
       PegEmpty : n = 0,
       PegAST(e,_) : peg_rel(peg)(e,n),
@@ -451,25 +523,25 @@ BEGIN
     ENDCASES
 
   peg_rel_nwf : LEMMA
-    FORALL (peg:PEGrammar) :
+    FORALL (peg:PEG) :
       NOT peg_rel(peg)(peg_nwf,0) AND
       NOT peg_rel(peg)(peg_nwf,1) AND
       NOT peg_rel(peg)(peg_nwf,-1)
 
   peg_rel_any : LEMMA
-    FORALL (peg:PEGrammar) :
+    FORALL (peg:PEG) :
       peg_rel(peg)(peg_any,1) AND
       peg_rel(peg)(peg_any,-1) AND
       NOT peg_rel(peg)(peg_any,0)
 
   peg_rel_proxy : LEMMA
-    FORALL (peg:PEGrammar) :
+    FORALL (peg:PEG) :
       peg_rel(peg)(peg_proxy,0) AND
       peg_rel(peg)(peg_proxy,1) AND
       peg_rel(peg)(peg_proxy,-1)
 
   % Defines relation WF in Section 3.6 [1]
-  wf(peg:PEGrammar,pegex:PEGex) : INDUCTIVE bool =
+  wf(peg:PEG,pegex:PEGex) : INDUCTIVE bool =
     CASES pegex OF
       PegEmpty : TRUE,
       PegAST(e,_) : wf(peg,e),
@@ -484,45 +556,45 @@ BEGIN
     ENDCASES
 
   peg_nwf : LEMMA
-     FORALL (peg:PEGrammar) :
+     FORALL (peg:PEG) :
      NOT wf(peg,peg_nwf)
 
-  WF(G:PEG,pegex:PEGex) : bool =
-    wf(peg(G),pegex)
+  WF(peg:PEG,pegex:PEGex) : bool =
+    wf(peg,pegex)
 
   test1_wf : LEMMA
-    LET peg = new_peg("A")
+    LET peg = empty_peg
               <| ("A" <<= "A") IN
     NOT WF(peg,"A")
 
   test2_wf : LEMMA
-    LET peg = new_peg("A")
+    LET peg = empty_peg
               <| ("A" <<= peg_any + "A") IN
     WF(peg,"A")
 
   test3_wf : LEMMA
-    LET peg = new_peg("B")
+    LET peg = empty_peg
               <| ("A" <<= peg_any + "B")
               <| ("B" <<= "A") IN
     WF(peg,"B")
 
   test4_wf : LEMMA
-    LET peg = new_peg("A")
+    LET peg = empty_peg
               <| ("A" <<= peg_any / "A") IN
     NOT WF(peg,"A")
 
   test5_wf : LEMMA
-    LET peg = new_peg("A")
+    LET peg = empty_peg
               <| ("A" <<= PegEmpty / "A") IN
     WF(peg,"A")
 
   test6_wf : LEMMA
-    LET peg = new_peg("A")
+    LET peg = empty_peg
               <| ("A" <<= PegFail / "A") IN
     NOT WF(peg,"A")
 
   test7_wf : LEMMA
-    LET peg = new_peg("A")
+    LET peg = empty_peg
               <| ("A" <<= PegStar("A")) IN
     NOT WF(peg,"A")
 

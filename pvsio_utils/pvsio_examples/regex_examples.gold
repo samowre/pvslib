@@ -17,6 +17,21 @@ None
 Some("a123AxC_", "")
 
 <PVSio> ==>
+None
+
+<PVSio> ==>
+Some("aaaa", "")
+
+<PVSio> ==>
+Some("", "aaaa")
+
+<PVSio> ==>
+Some("ab", "")
+
+<PVSio> ==>
+Some("ab", "")
+
+<PVSio> ==>
 Some("aaaaaaaaaa", "")
 
 <PVSio> ==>

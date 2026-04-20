@@ -57,7 +57,7 @@ BEGIN
     ENDCASES
     MEASURE pegex BY <<
 
-  max_label(peg:PEGrammar,max:nat) : RECURSIVE nat =
+  max_label(peg:PEG,max:nat) : RECURSIVE nat =
     IF null?(peg) THEN max
     ELSE
       LET (rule,e) =  car(peg),
@@ -66,7 +66,7 @@ BEGIN
     ENDIF
   MEASURE peg BY <<
 
-  peg_to_str(peg:PEGrammar,indent:posnat) : RECURSIVE string =
+  peg_to_str(peg:PEG,indent:posnat) : RECURSIVE string =
     IF null?(peg) THEN ""
     ELSE
       LET (rule,pegex) = car(peg) IN
@@ -74,17 +74,18 @@ BEGIN
     ENDIF
     MEASURE peg BY <<
 
-  to_str(G:PEG) : string =
-    LET indent = max_label(peg(G),0)+1 IN
-    format("~a",peg_to_str(peg(G),indent))
+  to_str(peg:PEG) : string =
+    LET indent = max_label(peg,0)+1 IN
+    format("~a",peg_to_str(peg,indent))
 
-  print(G:PEG) : void =
-    print(to_str(G))
+  print(peg:PEG) : void =
+    print(to_str(peg))
 
   % Print string message during AST construction
-  bld_print(msg:string)(opt_ast:Maybe[AST],ast_deck:ASTDeck) : MACRO [ASTOutput,ASTDeck] =
-  LET dummy = printf("~a~%",msg) IN
-    (OptAST(opt_ast),ast_deck)
+  bld_print(msg:string)(opt_ast:Maybe[AST],deck:ASTDeck)
+    : MACRO [ASTOutput,(valid_next?(deck))] =
+    LET dummy = printf("~a~%",msg) IN
+    (OptAST(opt_ast),next(deck))
 
   % Print a string message
   ast_print(str:string) : ASTBuilder =
@@ -92,40 +93,33 @@ BEGIN
 
   IMPORTING pvsio_utils@iterator_io[Item]
 
-  item2strf(strf:[AST->string])(item:Item) : string =
+  item2strf(strf:[AST->string])(item:Item) : MACRO string =
     IF token_item?(item) THEN format("~s",get_token(item)) ELSE strf(get_ast(item)) ENDIF
 
   deck2strf(strf:[AST->string])(opt_ast:Maybe[AST],deck:ASTDeck) : MACRO string =
     LET astr : string = IF none?(opt_ast) THEN "ϵ" ELSE strf(val(opt_ast)) ENDIF IN
     format("~a ↣ ~a", {| astr, iterator2strf(item2strf(strf))(deck) |})
 
-  bld_deckf(strf:[AST->string])(opt_ast:Maybe[AST],ast_deck:ASTDeck) : MACRO [ASTOutput,ASTDeck] =
-    LET dummy = printf("~a~%",deck2strf(strf)(opt_ast,ast_deck)) IN
-    (OptAST(opt_ast),ast_deck)
+  bld_deckf(strf:[AST->string])(opt_ast:Maybe[AST],deck:ASTDeck)
+    : MACRO [ASTOutput,(valid_next?(deck))] =
+    LET dummy = printf("~a~%",deck2strf(strf)(opt_ast,deck)) IN
+    (OptAST(opt_ast),next(deck))
 
   % Print AST deck given a formatter for AST
-  ast_deck(strf:[AST->string]) : ASTBuilder =
+  ast_deck(strf:[AST->string]) : MACRO ASTBuilder =
      ast_build(bld_deckf(strf))
 
   deck2str(opt_ast:Maybe[AST],deck:ASTDeck) : MACRO string =
     format("~a >–> ~a", {| opt_ast, to_str(deck) |})
 
-  bld_deck(opt_ast:Maybe[AST],ast_deck:ASTDeck) : MACRO [ASTOutput,ASTDeck] =
-    LET dummy = printf("~a~%",deck2str(opt_ast,ast_deck)) IN
-    (OptAST(opt_ast),ast_deck)
+  bld_deck(opt_ast:Maybe[AST],deck:ASTDeck)
+    : MACRO [ASTOutput,(valid_next?(deck))] =
+    LET dummy = printf("~a~%",deck2str(opt_ast,deck)) IN
+    (OptAST(opt_ast),next(deck))
 
   % Print AST deck given using a default formatter for AST
-  ast_deck : ASTBuilder =
+  ast_deck : MACRO ASTBuilder =
      ast_build(bld_deck)
-
-  tier2strf(strf:[AST->string])(tier:ASTTier) : string =
-    finseq2strf(item2strf(strf))(tier)
-
-  scaffold2strf(strf:[AST->string])(scaffold:list[ASTTier]) : MACRO string =
-    format("(: ~{~a~^, ~} :)", {| map(tier2strf(strf))(scaffold) |})
-
-  scaffold2str(scaffold:list[ASTTier]) : MACRO string =
-    format("(: ~{~a~^, ~} :)", {| map(to_str)(scaffold) |})
 
   % Print a state-generated message during parsing
   PegPrint(strf:[PegState->string]) : MACRO PEGex =
@@ -134,16 +128,16 @@ BEGIN
       NoAST)
 
   % Print a message during parsing
-  PegPrint(msg:string) : PEGex =
+  PegPrint(msg:string) : MACRO PEGex =
     PegPrint(LAMBDA(state:PegState):msg)
 
-  % Print AST scaffold Tgiven a formatter for AST
-  PegScaffold(strf:[AST->string]) : PEGex =
-    PegPrint(LAMBDA(state:PegState): scaffold2strf(strf)(state`scaffold))
+  % Print AST deck given a formatter for AST
+  PegDeck(strf:[AST->string]) : MACRO PEGex =
+    PegPrint(LAMBDA(state:PegState): iterator2strf(item2strf(strf))(deck(state)))
 
-  % Print AST scaffold using a default formatter for AST
-  PegScaffold : PEGex =
-    PegPrint(LAMBDA(state:PegState):scaffold2str(state`scaffold))
+  % Print AST deck using a default formatter for AST
+  PegDeck : MACRO PEGex =
+    PegPrint(LAMBDA(state:PegState): to_str(deck(state)))
 
   % Read a file into a string
   textfile_to_string(filename:string) : string =
@@ -153,26 +147,26 @@ BEGIN
              set(s, format("~a~a~%",{| val(s), fread_line(f) |})))),
 	   val(s))
 
-  MAXFOUNDSTR : Global[posnat] = ref[posnat](15)
+  PEG_MAXFOUNDSTR : Global[posnat] = ref[posnat](15)
 
   found_literal(str:string) : string =
-    LET split_at = floor(2*val(MAXFOUNDSTR)/5),
+    LET split_at = floor(2*val(PEG_MAXFOUNDSTR)/5),
         first_ln = charfind_first(char_newline,str),
         found    =
 	  IF first_ln < length(str) THEN
-            LET pref    = IF first_ln >= val(MAXFOUNDSTR) THEN
+            LET pref    = IF first_ln >= val(PEG_MAXFOUNDSTR) THEN
                             gen_strings.substr(str,0,split_at)
 		          ELSE
 		            gen_strings.substr(str,0,first_ln)
 		          ENDIF,
 		last_ln = charfind_last(char_newline,str),
-                posf    = IF length(str) - last_ln >= val(MAXFOUNDSTR) THEN
+                posf    = IF length(str) - last_ln >= val(PEG_MAXFOUNDSTR) THEN
 	                    gen_strings.substr(str,length(str)-split_at,length(str))
 		          ELSE
 		            gen_strings.substr(str,last_ln,length(str))
 		          ENDIF IN
             pref+" … "+posf
-          ELSIF length(str) >= MAXFOUNDSTR THEN
+          ELSIF length(str) >= PEG_MAXFOUNDSTR THEN
             LET pref = gen_strings.substr(str,0,split_at),
                 posf = gen_strings.substr(str,length(str)-split_at,length(str)) IN
               pref+" … "+posf
@@ -183,17 +177,40 @@ BEGIN
 
   found_string(str:string)(msg:string,loc:Location) : string =
     LET found =
-      IF loc`start_pos`npos < loc`end_pos`npos <= length(str) THEN
-        found_literal(gen_strings.substr(str,loc`start_pos`npos,loc`end_pos`npos))
+      IF loc`start_pos`nxt_pos < loc`end_pos`nxt_pos <= length(str) THEN
+        found_literal(gen_strings.substr(str,loc`start_pos`nxt_pos,loc`end_pos`nxt_pos))
       ELSE ""
       ENDIF IN
     format("~a~@[, found ~a~]",{| msg, {| found |} |})
 
-  PegError : TYPE = [string,Position]
+  PegError : TYPE = [string,[posnat,nat]]
+
+  % Return length of a string accounting for tab spaces
+  length_tabstr(tab:nat)(str:string) : nat =
+    for(0,length(str)-1,0,LAMBDA(i:below(length(str)),a:nat):
+      IF get(str,i) = char_tab THEN
+        LET mtab = mod(i,tab) IN
+	a+(tab-mtab)
+      ELSE
+        a+1
+      ENDIF)
+
+  PEG_TAB : Global[posnat] = ref[posnat](8)
+
+  lincol(str:string,pos:Position) : [posnat,nat] =
+    LET lin  = pos`num_lin+1,
+        col  = IF pos`nxt_pos <= length(str) THEN
+	         LET tabstr = gen_strings.substr(str,pos`pos_lin,pos`nxt_pos) IN
+	         length_tabstr(val(PEG_TAB))(tabstr)
+	       ELSE
+		 pos`nxt_pos-pos`pos_lin
+	       ENDIF IN
+    (lin,col)
 
   PEGException : Exception[PegError] =
-    make_exception(LAMBDA(msg:string,pos:Position):
-      format("~a, at line ~a, column ~a.", {| msg,pos`nlin+1,pos`ncol |}))
+    make_exception(LAMBDA(msg:string,lincol:[posnat,nat]):
+      LET (lin,col) = lincol IN
+      format("~a, at line ~a, column ~a.", {| msg,lin,col |}))
 
   failed_item2found_string(str:string)(failed_item:FailedItem) : string =
     found_string(str)(to_str(expected(failed_item)),location(failed_item))
@@ -204,30 +221,30 @@ BEGIN
   % Throw exeption if parse error.
   % If strict is set to TRUE, throws an exception if parse succeeds
   % but list of ASTs is empty
-  parse_string(G:PEG,str:string,strict:bool) :
+  parse_string(peg:PEG,str:string,strict:bool) :
     {l : list[AST] | strict IMPLIES cons?(l) } =
-    LET state  : PegState  = peg_parse(peg(G),start_rule(G),str),
+    LET state  : PegState  = peg_parse(peg,StartRule,str),
         status : PegStatus = state`status IN
     IF success?(status) THEN
       IF strict AND null?(get_asts(status)) THEN
-        throw(PEGException,("AST wasn't built",state`current_pos))
+        throw(PEGException,("AST wasn't built",lincol(str,current_pos(state))))
       ELSE
         get_asts(status)
       ENDIF
-    ELSIF fail?(status) THEN
+    ELSIF failure?(status) THEN
       LET failed_items = get_failed_items(status) IN
         IF null?(failed_items) THEN
-	   throw(PEGException,("Parse error",state`current_pos))
+	   throw(PEGException,("Parse error",lincol(str,current_pos(state))))
 	ELSE
 	  LET loc = location(car(failed_items)),
               l   = map(failed_item2found_string(str))(failed_items),
 	      lor = IF length(l) > 1 THEN snoc(rdc(l),format("or ~a",last(l))) ELSE l ENDIF,
 	      msg = format("Expecting ~{~a~^, ~}",{| lor |}) IN
-          throw(PEGException,(msg,loc`start_pos))
+          throw(PEGException,(msg,lincol(str,loc`start_pos)))
 	ENDIF
     ELSE
       LET loc = get_loc(status) IN
-      throw(PEGException,(found_string(str)(get_msg(status),loc),loc`start_pos))
+      throw(PEGException,(found_string(str)(get_msg(status),loc),lincol(str,loc`start_pos)))
     ENDIF
 
   % Parse from a string and return a list of ASTs.

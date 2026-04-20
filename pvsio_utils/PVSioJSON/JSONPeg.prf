@@ -1,0 +1,72 @@
+(|JSONPeg|
+ (|mk_str_TCC1| 0
+  (|mk_str_TCC1-1| NIL 3982320074 ("" (SUBTYPE-TCC) NIL NIL)
+   ((|real_ge_is_total_order| NAME-JUDGEMENT "(total_order?[real])"
+     |real_props| NIL)
+    (|real_le_is_total_order| NAME-JUDGEMENT "(total_order?[real])"
+     |real_props| NIL))
+   NIL
+   (|mk_str| SUBTYPE "1" "upto(length(JSONPeg.quoted_str))" (18 43 18 44))))
+ (|mk_str_TCC2| 0
+  (|mk_str_TCC2-1| NIL 3982320074 ("" (SUBTYPE-TCC) NIL NIL)
+   ((|real_ge_is_total_order| NAME-JUDGEMENT "(total_order?[real])"
+     |real_props| NIL)
+    (|real_le_is_total_order| NAME-JUDGEMENT "(total_order?[real])"
+     |real_props| NIL)
+    (|int_minus_int_is_int| APPLICATION-JUDGEMENT "int" |integers| NIL))
+   NIL
+   (|mk_str| SUBTYPE "(number_fields.-)(length(JSONPeg.quoted_str), 1)"
+    "subrange(1, length(JSONPeg.quoted_str))" (18 45 18 65))))
+ (|add_jobj_TCC1| 0
+  (|add_jobj_TCC1-1| NIL 3982320074
+   ("" (SKEEP*)
+    (("" (EXPAND "jobject_field_value")
+      (("" (LIFT-IF)
+        (("" (ASSERT)
+          (("" (SPLIT -5)
+            (("1" (LEMMA "jdict_add")
+              (("1" (INST?) (("1" (BETA) (("1" (ASSERT) NIL NIL)) NIL)) NIL))
+              NIL)
+             ("2" (PROPAX) NIL NIL))
+            NIL))
+          NIL))
+        NIL))
+      NIL))
+    NIL)
+   ((|jobject_field_value| CONST-DECL "Maybe[JValue]" |json_def| NIL)
+    (|real_ge_is_total_order| NAME-JUDGEMENT "(total_order?[real])"
+     |real_props| NIL)
+    (|int_minus_int_is_int| APPLICATION-JUDGEMENT "int" |integers| NIL)
+    (|injective_null| NAME-JUDGEMENT "(injective_dict?[T])" |json_def| NIL)
+    (|jdict_add| FORMULA-DECL NIL |json_def| NIL)
+    (- CONST-DECL "[numfield, numfield -> numfield]" |number_fields| NIL)
+    (|numfield| NONEMPTY-TYPE-EQ-DECL NIL |number_fields| NIL)
+    (|number_field_pred| CONST-DECL "[number -> boolean]" |number_fields| NIL)
+    (= CONST-DECL "[T, T -> boolean]" |equalities| NIL)
+    (|number| NONEMPTY-TYPE-DECL NIL |numbers| NIL)
+    (|jobject| ADT-ACCESSOR-DECL "[(jobject?) -> (injective_dict?[JValue])]"
+     |json_def| NIL)
+    (|jobject?| ADT-RECOGNIZER-DECL "[JValue -> boolean]" |json_def| NIL)
+    (|JDictionary| TYPE-EQ-DECL NIL |json_def| NIL)
+    (|injective_dict?| CONST-DECL "bool" |json_def| NIL)
+    (|list| TYPE-DECL NIL |list_adt| NIL)
+    (|JValue| TYPE-DECL NIL |json_def| NIL)
+    (|string| TYPE-EQ-DECL NIL |strings| NIL)
+    (|char| TYPE-EQ-DECL NIL |strings| NIL)
+    (|char?| ADT-RECOGNIZER-DECL "[character -> boolean]" |character_adt| NIL)
+    (|character| TYPE-DECL NIL |character_adt| NIL)
+    (|below| TYPE-EQ-DECL NIL |nat_types| NIL)
+    (|nat| NONEMPTY-TYPE-EQ-DECL NIL |naturalnumbers| NIL)
+    (|boolean| NONEMPTY-TYPE-DECL NIL |booleans| NIL)
+    (|bool| NONEMPTY-TYPE-EQ-DECL NIL |booleans| NIL)
+    (TRUE CONST-DECL "bool" |booleans| NIL))
+   NIL
+   (|add_jobj| SUBTYPE
+    "more_list_props[[string, json_def.JValue]].snoc(json_def.jobject(JSONPeg.jobj), (JSONPeg.key, JSONPeg.jval))"
+    "(json_def.injective_dict?[JValue])" (40 15 40 45))))
+ (|mk_jobject_TCC1| 0
+  (|mk_jobject_TCC1-1| NIL 3982320074 ("" (REWRITE "injective_null") NIL NIL)
+   ((|injective_null| JUDGEMENT-TCC NIL |json_def| NIL)) NIL
+   (|mk_jobject| SUBTYPE "list_adt[[string, json_def.JValue]].null"
+    "(json_def.injective_dict?[JValue])" (49 21 49 25)))))
+

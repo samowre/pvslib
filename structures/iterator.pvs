@@ -9,6 +9,12 @@ BEGIN
     next   : upto(length) % Index of next element to process
   #]
 
+  resize(it:Iterator,new_length:upto(it`length)) : Iterator =
+    it WITH [ `length := new_length,
+              `seq    := LAMBDA(i:below(new_length)): it`seq(i),
+	      `next   := 0
+            ]
+
   mk_iterator(fs:finseq[T]) : Iterator = (#
     length := fs`length,
     seq    := fs`seq,
@@ -30,6 +36,12 @@ BEGIN
     it`seq(i)
 
   CONVERSION get_it
+
+  has_last?(it:Iterator) : bool =
+    it`length > 0
+
+  last(it:(has_last?)) : T =
+    it`seq(length(it)-1)
 
   set_it(it:Iterator)(i:upto(length(it))) : {newit: Iterator | length(newit) = length(it) } =
     it WITH [ next := i ]

@@ -6,7 +6,7 @@ BEGIN
 
   push_scope(rule:Rule)(state:PegState) :
     {next_state : PegState | length(next_state`scopes) = length(state`scopes)+1}  =
-    state WITH [ `scopes := cons(mk_scope(rule,state`current_pos),state`scopes) ]
+    state WITH [ `scopes := cons(mk_scope(rule,current_pos(state)),state`scopes) ]
 
   pop_scope(state:PegState | length(state`scopes) > 0) :
     {next_state : PegState | length(next_state`scopes) = length(state`scopes)-1} =
@@ -19,52 +19,125 @@ BEGIN
     ELSIF null?(state`scaffold) THEN
       state
     ELSE
-      LET new_top  = add(item,car(state`scaffold)) IN
-      state WITH [ `scaffold := cons(new_top,cdr(state`scaffold)) ]
+      LET new_tier  = car(state`scaffold) WITH [
+                        items := add(item,car(state`scaffold)`items)
+		      ] IN
+      state WITH [ `scaffold := cons(new_tier,cdr(state`scaffold)) ]
     ENDIF
 
-  % Create an empty AST tier to become the new AST working tier
-  new_ast_tier(state:PegState) :
-    {next_state : PegState |  length(next_state`scaffold) = length(state`scaffold) + 1} =
-    state WITH [ `scaffold := cons(empty_seq,state`scaffold) ]
+  open_wrk_level(state:PegState) : {next_state : PegState | length(next_state`scaffold) > 0} =
+    LET new_tier = new_tier(state) IN
+    state WITH [ `scaffold := cons(new_tier,state`scaffold) ]
 
-  % Close AST tier and promote previous AST tier as the new AST working tier
-  close_ast_tier(state:PegState | length(state`scaffold) > 0) :
-    {next_state : PegState | length(next_state`scaffold) = length(state`scaffold) - 1} =
+  close_wrk_level(state:PegState | length(state`scaffold) > 0) : PegState =
     state WITH [ `scaffold := cdr(state`scaffold) ]
 
-  % Build a new item and add it to the end of AST tier
-  build_item(astf:MkASTFun)(state:PegState | length(state`scaffold) > 0) :
-    {next_state : PegState | NOT aborted?(next_state`status) IMPLIES
-                             length(next_state`scaffold) = length(state`scaffold)-1} =
-    LET ast_out = astf(state) IN
-    IF exit?(ast_out) THEN
-      LET loc = IF none?(get_opt_loc(ast_out)) THEN
-                  current_loc(state)
-		ELSE val(get_opt_loc(ast_out))
-		ENDIF IN
-      state WITH [ `status := Aborted(get_msg(ast_out),loc) ]
-    ELSIF none?(get_opt_ast(ast_out)) THEN
-      close_ast_tier(state)
-    ELSE
-      LET working_tier = working_tier(state),
-          (start_pos,end_pos) = IF length(working_tier) = 0 THEN
-	                          (state`current_pos,state`current_pos)
-				ELSE
-				  (get_loc(working_tier(0))`start_pos,
-				   get_loc(working_tier(length(working_tier)-1))`end_pos)
-				ENDIF,
-           item = ASTItem(val(get_opt_ast(ast_out)),mk_loc(current_scope(state),start_pos,end_pos)) IN
-      add_item(item)(close_ast_tier(state))
+  depth_scopes(scopes:list[Scope],pos:nat) : RECURSIVE {n: nat | n <= length(scopes)} =
+    IF null?(scopes) THEN 0
+    ELSE LET scope = car(scopes) IN
+      IF scope`pos`nxt_pos = pos THEN
+        1+depth_scopes(cdr(scopes),pos)
+      ELSIF scope`pos`nxt_pos > pos THEN
+        depth_scopes(cdr(scopes),pos)
+      ELSE
+        0
+      ENDIF
+    ENDIF
+    MEASURE scopes BY <<
+
+  full_scope_rules(scopes:list[Scope]) : finite_set[Rule] =
+    {rule : Rule | EXISTS (i:below(length(scopes))) : rule = nth(scopes,i)`rule}
+
+  depth_scope_rules(scopes:list[Scope],pos:nat) : finite_set[Rule] =
+    {rule:Rule | EXISTS (i:below(length(scopes))) :
+                   nth(scopes,i)`rule = rule AND
+		   nth(scopes,i)`pos`nxt_pos = pos}
+
+  depth_scope_rules_union : LEMMA
+    FORALL (scopes:(cons?[Scope]),pos:nat) :
+      depth_scope_rules(scopes,pos) =
+      union(depth_scope_rules((:car(scopes):),pos),
+            depth_scope_rules(cdr(scopes),pos))
+
+  depth_scope_rules_singleton : LEMMA
+    FORALL (scope:Scope):
+      card(depth_scope_rules((: scope :),scope`pos`nxt_pos)) = 1
+
+  member_scope_rules?(scopes:list[Scope])(rule:Rule,pos:nat) :bool =
+    EXISTS(i:below(length(scopes))):
+      nth(scopes,i)`rule = rule AND
+      nth(scopes,i)`pos`nxt_pos = pos
+
+  depth_scope_rules_disjoint : LEMMA
+     FORALL (scope:Scope,scopes:list[Scope]):
+     NOT member_scope_rules?(scopes)(scope`rule,scope`pos`nxt_pos) IMPLIES
+     disjoint?(depth_scope_rules((: scope :),scope`pos`nxt_pos),
+               depth_scope_rules(scopes,scope`pos`nxt_pos))
+
+  depth_scopes_j : RECURSIVE JUDGEMENT
+    depth_scopes(scopes:(sorted_scopes?),pos:nat) HAS_TYPE
+      {n : nat | n = card(depth_scope_rules(scopes,pos))}
+
+  depth_scopes(state:PegState) : {n: nat | n <= length(state`scopes) } =
+    IF null?(state`scopes) THEN 0
+    ELSE LET scope = car(state`scopes) IN
+      1+depth_scopes(cdr(state`scopes),scope`pos`nxt_pos)
     ENDIF
 
-  set_last_token(token:TokenItem)(state:PegState) : PegState =
-    state WITH [ `last_token := token ]
+  depth_scopes_eq : LEMMA
+    FORALL (state1,state2:PegState) :
+      state1`scopes = state2`scopes IMPLIES
+      depth_scopes(state1) = depth_scopes(state2)
+
+  valid_scopes?(peg:PEG)(state:PegState) : bool =
+    % Position of current scope is less or equal than pos
+    current_scope(state)`pos`nxt_pos <= current_pos(state)`nxt_pos AND
+    % Scopes are sorted
+    sorted_scopes?(state`scopes) AND
+    % All scope rules are in peg
+    FORALL (i:below(length(state`scopes))):
+      some?(peg_find_rule(peg)(nth(state`scopes,i)`rule))
+
+  valid_scopes_eq : LEMMA
+    FORALL (peg:PEG,state1,state2:PegState) :
+      current_pos(state1)`nxt_pos <= current_pos(state2)`nxt_pos AND
+      state1`scopes = state2`scopes AND
+      valid_scopes?(peg)(state1) IMPLIES
+      valid_scopes?(peg)(state2)
+
+  valid_pegstate?(peg:PEG,str:string)(state:PegState) : bool =
+    % Current position is valid
+    valid_pos?(length(str))(current_pos(state)) AND
+    % Scopes are valid
+    valid_scopes?(peg)(state)
+
+  valid_next_pegstate?(state:PegState)(next_state:PegState) : MACRO bool =
+      current_pos(next_state)`nxt_pos >= current_pos(state)`nxt_pos AND
+      length(next_state`scaffold) >= length(state`scaffold) AND
+      depth_scopes(next_state) >= depth_scopes(state)
+
+  depth_scopes_pegstate : JUDGEMENT
+    depth_scopes(state:PegState | sorted_scopes?(state`scopes)) HAS_TYPE
+      {n : upto(length(state`scopes)) |
+           n = IF null?(state`scopes) THEN 0
+	       ELSE card(depth_scope_rules(state`scopes,car(state`scopes)`pos`nxt_pos))
+	       ENDIF}
+
+  in_sorted_scopes(scopes:(sorted_scopes?))
+                  (rule:Rule,pos:Position |
+                   cons?(scopes) IMPLIES pos`nxt_pos >= car(scopes)`pos`nxt_pos)
+    : RECURSIVE { b : bool | b = member_scope_rules?(scopes)(rule,pos`nxt_pos) } =
+    cons?(scopes) AND
+    LET scope = car(scopes) IN
+      pos`nxt_pos = scope`pos`nxt_pos AND  % This take advantange that scopes are sorted
+      (rule = scope`rule OR in_sorted_scopes(cdr(scopes))(rule,pos))
+    MEASURE length(scopes)
 
   set_fail_status(state:PegState) : PegState =
-    state WITH [ `status := Fail(state`failed_items) ]
+    state WITH [ `status := Failure(state`failed_items) ]
 
-  in_failed_items(label:ReportingLabel,scope:Scope)(failed_items:list[FailedItem]) : RECURSIVE bool =
+  in_failed_items(label:ReportingLabel,scope:Scope)(failed_items:list[FailedItem]) :
+    RECURSIVE bool =
     cons?(failed_items) AND
     LET failed_item = car(failed_items) IN
       (label = failed_item`expected AND scope = failed_item`location`scope) OR
@@ -75,82 +148,71 @@ BEGIN
     car(state`failed_items)`location
 
   loc_gt(loc1,loc2:Location) : bool =
-    loc1`start_pos`npos > loc2`start_pos`npos OR
-    (loc1`start_pos`npos = loc2`start_pos`npos AND loc1`end_pos`npos > loc2`end_pos`npos)
+    loc1`start_pos`nxt_pos > loc2`start_pos`nxt_pos OR
+    (loc1`start_pos`nxt_pos = loc2`start_pos`nxt_pos AND
+     loc1`end_pos`nxt_pos > loc2`end_pos`nxt_pos)
 
   loc_eq(loc1,loc2:Location) : bool =
-    loc1`start_pos`npos = loc2`start_pos`npos AND
-    loc1`end_pos`npos = loc2`end_pos`npos
+    loc1`start_pos`nxt_pos = loc2`start_pos`nxt_pos AND
+    loc1`end_pos`nxt_pos = loc2`end_pos`nxt_pos
 
-  report_failed_item(label:ReportingLabel,start_pos,end_pos:Position)(state:PegState) : PegState =
-    LET scope = current_scope(state),
-	loc   = mk_loc(scope,start_pos,end_pos),
-	gt    = cons?(state`failed_items) IMPLIES loc_gt(loc,failed_loc(state)),
+  peg_failed_item(label:ReportingLabel,opt_loc:Maybe[Location])(state:PegState) : PegState =
+    LET loc   = IF none?(opt_loc) THEN current_loc(state)
+	        ELSE val(opt_loc)
+	        ENDIF,
+        gt    = cons?(state`failed_items) IMPLIES loc_gt(loc,failed_loc(state)),
 	ge    = (gt OR loc_eq(loc,failed_loc(state))) IN
     IF null?(state`failed_items) OR
-       (ge AND NOT in_failed_items(label,scope)(state`failed_items)) THEN
+       (ge AND NOT in_failed_items(label,loc`scope)(state`failed_items)) THEN
       LET failed_item = mk_failed_item(label,loc) IN
       IF null?(state`failed_items) OR gt THEN
-        state WITH [
-	  `failed_items := (: failed_item :)
-	]
+        set_fail_status(state WITH [ `failed_items := (: failed_item :) ])
       ELSE
-        state WITH [
-          `failed_items := snoc(state`failed_items,failed_item)
-        ]
+        set_fail_status(state WITH [
+	  `failed_items := snoc(state`failed_items,failed_item)
+	])
       ENDIF
     ELSE
-      state
+      set_fail_status(state)
     ENDIF
 
-  length_scopes(scopes:list[Scope],top:nat) : RECURSIVE nat =
-    IF null?(scopes) THEN 0
-    ELSE LET scope = car(scopes) IN
-      IF scope`pos`npos = top THEN
-        1+length_scopes(cdr(scopes),top)
-      ELSE
-        length_scopes(cdr(scopes),top)
-      ENDIF
+  peg_failed_item_j : JUDGEMENT
+    FORALL(peg:PEG,str:string,label:ReportingLabel,opt_loc:Maybe[Location],state:(valid_pegstate?(peg,str))):
+      peg_failed_item(label,opt_loc)(state) HAS_TYPE
+      {next_state:(valid_pegstate?(peg,str)) | valid_next_pegstate?(state)(next_state)}
+
+  % Build a new item and add it to the end of AST deck
+  build_item(opt_ast:Maybe[AST])(state:PegState | success?(state`status) AND
+						  length(state`scaffold) > 0)
+    : PegState =
+    IF none?(opt_ast) THEN
+      close_wrk_level(state)
+    ELSE
+      LET items = car(state`scaffold)`items,
+          (start_pos,end_pos) =
+            IF length(items) = 0 THEN
+	      (current_pos(state),current_pos(state))
+	    ELSE
+	      LET last = length(items) - 1 IN 
+	      (get_loc(items(0))`start_pos,get_loc(items(last))`end_pos)
+	    ENDIF,
+          item = ASTItem(val(opt_ast),mk_loc(current_scope(state),start_pos,end_pos)) IN
+      add_item(item)(close_wrk_level(state))
     ENDIF
-    MEASURE scopes BY <<
 
-  length_scopes(state:PegState) : nat =
-    IF null?(state`scopes) THEN 0
-    ELSE LET scope = car(state`scopes) IN
-      1+length_scopes(cdr(state`scopes),scope`pos`npos)
-    ENDIF
+  peg_abort(msg:string,opt_loc:Maybe[Location])(state:PegState) : PegState =
+    LET loc = IF none?(opt_loc) THEN current_loc(state)
+	      ELSE val(opt_loc)
+	      ENDIF IN
+    state WITH [ `status := Aborted(msg,loc) ]
 
-  valid_scopes?(n:nat,state:PegState) : bool =
-    % Position of current scope is less or equal than pos
-    current_scope(state)`pos`npos <= state`current_pos`npos AND
-    % Scopes are sorted by pos
-    (FORALL (i,j:below(length(state`scopes))):
-     i < j IMPLIES (nth(state`scopes,i)`pos`npos <= nth(state`scopes,j)`pos`npos AND
-                    nth(state`scopes,i) /= nth(state`scopes,j))) AND
-    % Lenght of scopes is bounded by peg
-    length_scopes(state) <= n
 
-  valid_pegstate?(peg:PEGrammar,str:string)(state:PegState) : bool =
-    success?(state`status) AND
-    valid_pos?(str)(state`current_pos) AND
-    valid_scopes?(length(peg),state)
+  IMPORTING orders@orders_nat,
+            orders@lex2_generic
 
-  in_scopes(rule:Rule,pos:Position)(scopes:list[Scope]) : RECURSIVE bool =
-    cons?(scopes) AND
-    LET scope = car(scopes) IN
-      pos`npos = scope`pos`npos AND  % This take advantange that scopes are sorted
-      (rule = scope`rule OR in_scopes(rule,pos)(cdr(scopes)))
-    MEASURE scopes BY <<
-
-  peg_abort(msg:string)(state:PegState) : PegState =
-    state WITH [ `status := Aborted(msg,current_loc(state)) ]
-
-  peg_parse(peg:PEGrammar,pegex:PEGex,str:string,lookup:bool)
-           (state:(valid_pegstate?(peg,str)) | success?(state`status)) : RECURSIVE
-    {next_state : (valid_pegstate?(peg,str)) |
-      success?(state`status) IMPLIES
-        current_pos(next_state)`npos >= state`current_pos`npos AND
-	length_scopes(next_state) = length_scopes(state)} =
+  peg_parse(peg:PEG,pegex:PEGex,str:string,lookup:bool)
+           (state:(valid_pegstate?(peg,str)) | success?(state`status))
+    : RECURSIVE { next_state : (valid_pegstate?(peg,str)) | valid_next_pegstate?(state)(next_state) } =
     % status is always Success at the beginning of the recursion
     CASES pegex OF
       PegEmpty : state,
@@ -158,34 +220,40 @@ BEGIN
         IF lookup THEN
 	  peg_parse(peg,e,str,lookup)(state)
 	ELSE
-          LET state1    = new_ast_tier(state),
-	      state2    = peg_parse(peg,e,str,lookup)(state1) IN
-	  IF aborted?(state2`status) THEN
-	    state2
-	  ELSIF fail?(state2`status) THEN
-	    close_ast_tier(state2)
+          LET state1 = peg_parse(peg,e,str,lookup)(open_wrk_level(state)) IN
+	  IF success?(state1`status) THEN
+	    LET ast_out = astf(state1) IN
+	    IF exit?(ast_out) THEN
+              peg_abort(get_msg(ast_out),get_opt_loc(ast_out))(state1)
+	    ELSIF fail?(ast_out) THEN
+	      LET label = get_label(ast_out) IN
+              IF reporting_label?(label) THEN
+                peg_failed_item(label,get_opt_loc(ast_out))(state1)
+	      ELSE
+	        set_fail_status(state1)
+	      ENDIF
+	    ELSE
+	      build_item(get_opt_ast(ast_out))(state1)
+	    ENDIF
 	  ELSE
-	    build_item(astf)(state2)
+	    state1
 	  ENDIF
 	ENDIF,
       PegTerminal(rgx,label,build) :
-        LET mpos    = match_pos(rgx,str,state`current_pos),
-	    end_pos = get_pos(mpos) IN
+        LET mpos    = match_pos(rgx,str,current_pos(state)),
+	    end_pos = mpos`pos,
+	    loc     = mk_loc(current_scope(state),current_pos(state),end_pos) IN
 	  % Fail also if no char is consumed
-	  IF fail?(mpos) OR end_pos`npos = state`current_pos`npos THEN
+	  IF NOT success(mpos) OR end_pos`nxt_pos = current_pos(state)`nxt_pos THEN
 	    IF lookup OR NOT reporting_label?(label) THEN
 	       set_fail_status(state)
 	    ELSE
-               set_fail_status(report_failed_item(label,state`current_pos,end_pos)(state))
+               peg_failed_item(label,loc)(state)
 	    ENDIF
 	  ELSE
-	    LET token      = gen_strings.substr(str,state`current_pos`npos,end_pos`npos),
-	        scope      = current_scope(state),
-	        item       = TokenItem(label,token,mk_loc(scope,state`current_pos,end_pos)),
-	        next_state = state WITH [
-			       `last_token  := item,
-			       `current_pos := end_pos
-			     ] IN
+	    LET token      = gen_strings.substr(str,current_pos(state)`nxt_pos,end_pos`nxt_pos),
+	        item       = TokenItem(label,token,loc),
+	        next_state = state WITH [ `last_token  := item ] IN
 	    IF lookup OR NOT build THEN
 	      next_state
 	    ELSE
@@ -195,22 +263,22 @@ BEGIN
       PegNonTerminal(rule) :
         LET opt_rule = peg_find_rule(peg)(rule) IN
 	IF none?(opt_rule) THEN
-	  peg_abort("Undefined rule "+rule)(state)
-	ELSIF in_scopes(rule,state`current_pos)(state`scopes) OR
-	      length_scopes(state) = length(peg) THEN
-	  peg_abort("Possible left recursion")(state)
+	  peg_abort("Undefined rule ("+rule+")",None)(state)
+	ELSIF in_sorted_scopes(state`scopes)(rule,current_pos(state)) OR
+	      depth_scopes(state) = length(peg) THEN
+	  peg_abort("Possible left recursion ("+rule+")",None)(state)
 	ELSE
 	  LET state1 = push_scope(rule)(state),
 	      state2 = peg_parse(peg,val(opt_rule),str,lookup)(state1) IN
-	    IF aborted?(state2`status) THEN
-	      state2 
-	    ELSE
+	    IF success?(state2`status) THEN
 	      pop_scope(state2)
+	    ELSE
+	      state2
 	    ENDIF
 	ENDIF,
       PegSeq(e1,e2) :
         LET state1 = peg_parse(peg,e1,str,lookup)(state) IN
-	IF aborted?(state1`status) OR fail?(state1`status) THEN
+	IF aborted?(state1`status) OR failure?(state1`status) THEN
 	  state1
 	ELSE
 	  peg_parse(peg,e2,str,lookup)(state1)
@@ -229,12 +297,12 @@ BEGIN
         LET state1 = peg_parse(peg,e,str,lookup)(state) IN
 	IF aborted?(state1`status) THEN
 	  state1
-	ELSIF fail?(state1`status) THEN
+	ELSIF failure?(state1`status) THEN
 	  state WITH [
 	    `failed_items := state1`failed_items
 	  ]
-	ELSIF state`current_pos`npos = current_pos(state1)`npos THEN
-	  peg_abort("Possible infinite loop")(state1)
+	ELSIF current_pos(state)`nxt_pos = current_pos(state1)`nxt_pos THEN
+	  peg_abort("Possible infinite loop",None)(state1)
 	ELSE
 	  peg_parse(peg,PegStar(e),str,lookup)(state1)
 	ENDIF,
@@ -242,27 +310,22 @@ BEGIN
         LET state1 = peg_parse(peg,e,str,TRUE)(state) IN
 	IF aborted?(state1`status) THEN
 	  state1
-	ELSIF fail?(state1`status) THEN
+	ELSIF failure?(state1`status) THEN
 	  state
 	ELSIF reporting_label?(label) THEN
-	  set_fail_status(report_failed_item(label,state`current_pos,state1`current_pos)(state))
+	  LET loc = mk_loc(current_scope(state),current_pos(state),current_pos(state1)) IN
+	  peg_failed_item(label,loc)(state)
 	ELSE
 	  set_fail_status(state)
 	ENDIF
     ENDCASES
-  MEASURE length(str)-state`current_pos`npos
+  MEASURE ((length(state`scopes)-depth_scopes(state))::nat,
+           (pegex,(length(str)-current_pos(state)`nxt_pos)::nat)) BY lt_lex2(lt_nat,lt_lex2(<<,lt_nat))
 
-  peg_parse(peg:PEGrammar,pegex:PEGex,str:string) : PegState =
+  peg_parse(peg:PEG,pegex:PEGex,str:string) : PegState =
     peg_parse(peg,pegex,str,FALSE)(init_state)
 
-  start_rule(G:PEG) : Rule =
-    IF none?(peg_find_rule(peg(G))(StartRule)) THEN
-      G`start
-    ELSE
-      StartRule
-    Endif
-
-  parse(G:PEG,str:string) : PegStatus =
-    peg_parse(peg(G),start_rule(G),str)`status
+  parse(peg:PEG,str:string) : PegStatus =
+    peg_parse(peg,StartRule,str)`status
 
 END peg

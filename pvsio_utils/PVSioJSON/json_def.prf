@@ -1,0 +1,332 @@
+(|json_def|
+ (|injective_dict?_TCC1| 0
+  (|injective_dict?_TCC1-1| NIL 3982333115 ("" (SUBTYPE-TCC) NIL NIL) NIL NIL
+   (|injective_dict?| SUBTYPE "json_def.j" "below[length[[string, T]](dict)]"
+    (9 32 9 33))))
+ (|injective_dict| 0
+  (|injective_dict-1| NIL 3982333123
+   ("" (SKEEP)
+    (("" (SPLIT)
+      (("1" (FLATTEN)
+        (("1" (SKEEP :PREDS? T)
+          (("1" (EXPAND "injective_dict?")
+            (("1" (CASE "i < j")
+              (("1" (INSTEEP -4)
+                (("1" (ASSERT) NIL NIL) ("2" (ASSERT) NIL NIL)) NIL)
+               ("2" (INST -3 "j" "i")
+                (("1" (ASSERT) NIL NIL) ("2" (ASSERT) NIL NIL)) NIL))
+              NIL))
+            NIL))
+          NIL))
+        NIL)
+       ("2" (FLATTEN)
+        (("2" (EXPAND "injective_dict?")
+          (("2" (SKEEP) (("2" (INSTEEP) (("2" (ASSERT) NIL NIL)) NIL)) NIL))
+          NIL))
+        NIL))
+      NIL))
+    NIL)
+   ((|number| NONEMPTY-TYPE-DECL NIL |numbers| NIL)
+    (|boolean| NONEMPTY-TYPE-DECL NIL |booleans| NIL)
+    (|number_field_pred| CONST-DECL "[number -> boolean]" |number_fields| NIL)
+    (|number_field| NONEMPTY-TYPE-FROM-DECL NIL |number_fields| NIL)
+    (|real_pred| CONST-DECL "[number_field -> boolean]" |reals| NIL)
+    (|real| NONEMPTY-TYPE-FROM-DECL NIL |reals| NIL)
+    (|bool| NONEMPTY-TYPE-EQ-DECL NIL |booleans| NIL)
+    (< CONST-DECL "bool" |reals| NIL)
+    (|rational_pred| CONST-DECL "[real -> boolean]" |rationals| NIL)
+    (|rational| NONEMPTY-TYPE-FROM-DECL NIL |rationals| NIL)
+    (|integer_pred| CONST-DECL "[rational -> boolean]" |integers| NIL)
+    (|int| NONEMPTY-TYPE-EQ-DECL NIL |integers| NIL)
+    (>= CONST-DECL "bool" |reals| NIL)
+    (|nat| NONEMPTY-TYPE-EQ-DECL NIL |naturalnumbers| NIL)
+    (|below| TYPE-EQ-DECL NIL |nat_types| NIL)
+    (|character| TYPE-DECL NIL |character_adt| NIL)
+    (|char?| ADT-RECOGNIZER-DECL "[character -> boolean]" |character_adt| NIL)
+    (|char| TYPE-EQ-DECL NIL |strings| NIL)
+    (|string| TYPE-EQ-DECL NIL |strings| NIL) NIL
+    (|list| TYPE-DECL NIL |list_adt| NIL)
+    (|length| DEF-DECL "nat" |list_props| NIL)
+    (|below| TYPE-EQ-DECL NIL |naturalnumbers| NIL)
+    (|real_lt_is_strict_total_order| NAME-JUDGEMENT
+     "(strict_total_order?[real])" |real_props| NIL)
+    (|int_minus_int_is_int| APPLICATION-JUDGEMENT "int" |integers| NIL)
+    (|posint_plus_nnint_is_posint| APPLICATION-JUDGEMENT "posint" |integers|
+     NIL)
+    (|minus_nzint_is_nzint| APPLICATION-JUDGEMENT "nzint" |integers| NIL)
+    (|real_le_is_total_order| NAME-JUDGEMENT "(total_order?[real])"
+     |real_props| NIL)
+    NIL NIL NIL
+    (+ CONST-DECL "[numfield, numfield -> numfield]" |number_fields| NIL)
+    (|numfield| NONEMPTY-TYPE-EQ-DECL NIL |number_fields| NIL)
+    (<= CONST-DECL "bool" |reals| NIL)
+    (AND CONST-DECL "[bool, bool -> bool]" |booleans| NIL)
+    (- CONST-DECL "[numfield, numfield -> numfield]" |number_fields| NIL)
+    (|subrange| TYPE-EQ-DECL NIL |integers| NIL)
+    (|injective_dict?| CONST-DECL "bool" |json_def| NIL)
+    (|real_ge_is_total_order| NAME-JUDGEMENT "(total_order?[real])"
+     |real_props| NIL))
+   SHOSTAK))
+ (|injective_null| 0
+  (|injective_null-1| NIL 3982320037 ("" (GRIND) NIL NIL)
+   ((|boolean| NONEMPTY-TYPE-DECL NIL |booleans| NIL)
+    (|bool| NONEMPTY-TYPE-EQ-DECL NIL |booleans| NIL)
+    (NOT CONST-DECL "[bool -> bool]" |booleans| NIL)
+    (|number| NONEMPTY-TYPE-DECL NIL |numbers| NIL)
+    (|number_field_pred| CONST-DECL "[number -> boolean]" |number_fields| NIL)
+    (|number_field| NONEMPTY-TYPE-FROM-DECL NIL |number_fields| NIL)
+    (|real_pred| CONST-DECL "[number_field -> boolean]" |reals| NIL)
+    (|real| NONEMPTY-TYPE-FROM-DECL NIL |reals| NIL)
+    (< CONST-DECL "bool" |reals| NIL)
+    (|rational_pred| CONST-DECL "[real -> boolean]" |rationals| NIL)
+    (|rational| NONEMPTY-TYPE-FROM-DECL NIL |rationals| NIL)
+    (|integer_pred| CONST-DECL "[rational -> boolean]" |integers| NIL)
+    (|int| NONEMPTY-TYPE-EQ-DECL NIL |integers| NIL)
+    (>= CONST-DECL "bool" |reals| NIL)
+    (|nat| NONEMPTY-TYPE-EQ-DECL NIL |naturalnumbers| NIL)
+    (|below| TYPE-EQ-DECL NIL |nat_types| NIL)
+    (|character| TYPE-DECL NIL |character_adt| NIL)
+    (|char?| ADT-RECOGNIZER-DECL "[character -> boolean]" |character_adt| NIL)
+    (|char| TYPE-EQ-DECL NIL |strings| NIL)
+    (|string| TYPE-EQ-DECL NIL |strings| NIL)
+    (|list| TYPE-DECL NIL |list_adt| NIL)
+    (|length| DEF-DECL "nat" |list_props| NIL)
+    (|null?| ADT-RECOGNIZER-DECL "[list -> boolean]" |list_adt| NIL)
+    (|null| ADT-CONSTRUCTOR-DECL "(null?)" |list_adt| NIL)
+    (|below| TYPE-EQ-DECL NIL |naturalnumbers| NIL)
+    (|real_lt_is_strict_total_order| NAME-JUDGEMENT
+     "(strict_total_order?[real])" |real_props| NIL)
+    (|injective_dict?| CONST-DECL "bool" |json_def| NIL))
+   NIL
+   (|injective_null| SUBTYPE "list_adt[[string, json_def.T]].null"
+    "(json_def.injective_dict?[T])" (17 4 17 8))))
+ (|JValue_ord_defaxiom| 0
+  (|JValue_ord_defaxiom-1| NIL 3982339713 ("" (POSTPONE) NIL NIL) NIL SHOSTAK))
+ (|JValue_JObject_extensionality| 0
+  (|JValue_JObject_extensionality-1| NIL 3982339713 ("" (POSTPONE) NIL NIL) NIL
+   SHOSTAK))
+ (|JValue_JObject_eta| 0
+  (|JValue_JObject_eta-1| NIL 3982339713 ("" (POSTPONE) NIL NIL) NIL SHOSTAK))
+ (|JValue_JArray_extensionality| 0
+  (|JValue_JArray_extensionality-1| NIL 3982339713 ("" (POSTPONE) NIL NIL) NIL
+   SHOSTAK))
+ (|JValue_JArray_eta| 0
+  (|JValue_JArray_eta-1| NIL 3982339713 ("" (POSTPONE) NIL NIL) NIL SHOSTAK))
+ (|JValue_JNum_extensionality| 0
+  (|JValue_JNum_extensionality-1| NIL 3982339713 ("" (POSTPONE) NIL NIL) NIL
+   SHOSTAK))
+ (|JValue_JNum_eta| 0
+  (|JValue_JNum_eta-1| NIL 3982339713 ("" (POSTPONE) NIL NIL) NIL SHOSTAK))
+ (|JValue_JStr_extensionality| 0
+  (|JValue_JStr_extensionality-1| NIL 3982339713 ("" (POSTPONE) NIL NIL) NIL
+   SHOSTAK))
+ (|JValue_JStr_eta| 0
+  (|JValue_JStr_eta-1| NIL 3982339713 ("" (POSTPONE) NIL NIL) NIL SHOSTAK))
+ (|JValue_JBool_extensionality| 0
+  (|JValue_JBool_extensionality-1| NIL 3982339713 ("" (POSTPONE) NIL NIL) NIL
+   SHOSTAK))
+ (|JValue_JBool_eta| 0
+  (|JValue_JBool_eta-1| NIL 3982339713 ("" (POSTPONE) NIL NIL) NIL SHOSTAK))
+ (|JValue_JNull_extensionality| 0
+  (|JValue_JNull_extensionality-1| NIL 3982339713 ("" (POSTPONE) NIL NIL) NIL
+   SHOSTAK))
+ (|JValue_jobject_JObject| 0
+  (|JValue_jobject_JObject-1| NIL 3982339713 ("" (POSTPONE) NIL NIL) NIL
+   SHOSTAK))
+ (|JValue_jarray_JArray| 0
+  (|JValue_jarray_JArray-1| NIL 3982339713 ("" (POSTPONE) NIL NIL) NIL
+   SHOSTAK))
+ (|JValue_jnum_JNum| 0
+  (|JValue_jnum_JNum-1| NIL 3982339713 ("" (POSTPONE) NIL NIL) NIL SHOSTAK))
+ (|JValue_jstr_JStr| 0
+  (|JValue_jstr_JStr-1| NIL 3982339713 ("" (POSTPONE) NIL NIL) NIL SHOSTAK))
+ (|JValue_jbool_JBool| 0
+  (|JValue_jbool_JBool-1| NIL 3982339713 ("" (POSTPONE) NIL NIL) NIL SHOSTAK))
+ (|JValue_inclusive| 0
+  (|JValue_inclusive-1| NIL 3982339713 ("" (POSTPONE) NIL NIL) NIL SHOSTAK))
+ (|JValue_induction| 0
+  (|JValue_induction-1| NIL 3982339713 ("" (POSTPONE) NIL NIL) NIL SHOSTAK))
+ (|JValue_well_founded| 0
+  (|JValue_well_founded-1| NIL 3982339713 ("" (POSTPONE) NIL NIL) NIL SHOSTAK))
+ (|jobject_field_value_TCC1| 0
+  (|jobject_field_value_TCC1-1| NIL 3982320037 ("" (SUBTYPE-TCC) NIL NIL)
+   ((|real_le_is_total_order| NAME-JUDGEMENT "(total_order?[real])"
+     |real_props| NIL)
+    (|int_minus_int_is_int| APPLICATION-JUDGEMENT "int" |integers| NIL)
+    (|boolean| NONEMPTY-TYPE-DECL NIL |booleans| NIL)
+    (|bool| NONEMPTY-TYPE-EQ-DECL NIL |booleans| NIL)
+    (NOT CONST-DECL "[bool -> bool]" |booleans| NIL)
+    (|JValue| TYPE-DECL NIL |json_def| NIL)
+    (|jobject?| ADT-RECOGNIZER-DECL "[JValue -> boolean]" |json_def| NIL)
+    (|number| NONEMPTY-TYPE-DECL NIL |numbers| NIL)
+    (|number_field_pred| CONST-DECL "[number -> boolean]" |number_fields| NIL)
+    (|number_field| NONEMPTY-TYPE-FROM-DECL NIL |number_fields| NIL)
+    (|real_pred| CONST-DECL "[number_field -> boolean]" |reals| NIL)
+    (|real| NONEMPTY-TYPE-FROM-DECL NIL |reals| NIL)
+    (|rational_pred| CONST-DECL "[real -> boolean]" |rationals| NIL)
+    (|rational| NONEMPTY-TYPE-FROM-DECL NIL |rationals| NIL)
+    (|integer_pred| CONST-DECL "[rational -> boolean]" |integers| NIL)
+    (|int| NONEMPTY-TYPE-EQ-DECL NIL |integers| NIL)
+    (>= CONST-DECL "bool" |reals| NIL)
+    (|nat| NONEMPTY-TYPE-EQ-DECL NIL |naturalnumbers| NIL)
+    (<= CONST-DECL "bool" |reals| NIL)
+    (|below| TYPE-EQ-DECL NIL |nat_types| NIL)
+    (|character| TYPE-DECL NIL |character_adt| NIL)
+    (|char?| ADT-RECOGNIZER-DECL "[character -> boolean]" |character_adt| NIL)
+    (|char| TYPE-EQ-DECL NIL |strings| NIL)
+    (|string| TYPE-EQ-DECL NIL |strings| NIL)
+    (|list| TYPE-DECL NIL |list_adt| NIL)
+    (|length| DEF-DECL "nat" |list_props| NIL)
+    (|injective_dict?| CONST-DECL "bool" |json_def| NIL)
+    (|jobject| ADT-ACCESSOR-DECL "[(jobject?) -> (injective_dict?[JValue])]"
+     |json_def| NIL)
+    (|upto| NONEMPTY-TYPE-EQ-DECL NIL |naturalnumbers| NIL)
+    (AND CONST-DECL "[bool, bool -> bool]" |booleans| NIL)
+    (= CONST-DECL "[T, T -> boolean]" |equalities| NIL)
+    (|numfield| NONEMPTY-TYPE-EQ-DECL NIL |number_fields| NIL)
+    (- CONST-DECL "[numfield, numfield -> numfield]" |number_fields| NIL)
+    (< CONST-DECL "bool" |reals| NIL)
+    (|below| TYPE-EQ-DECL NIL |naturalnumbers| NIL)
+    (|nth| DEF-DECL "T" |list_props| NIL)
+    (IMPLIES CONST-DECL "[bool, bool -> bool]" |booleans| NIL)
+    (|cons?| ADT-RECOGNIZER-DECL "[list -> boolean]" |list_adt| NIL)
+    (|car| ADT-ACCESSOR-DECL "[(cons?) -> T]" |list_adt| NIL)
+    (|subrange| TYPE-EQ-DECL NIL |integers| NIL)
+    (|injective_null| NAME-JUDGEMENT "(injective_dict?[T])" |json_def| NIL))
+   NIL
+   (|jobject_field_value| SUBTYPE "json_def.l"
+    "(list_adt[[string, json_def.JValue]].cons?)" (37 15 37 16))))
+ (|jdict_add| 0
+  (|jdict_add-1| NIL 3982341417
+   ("" (SKEEP :PREDS? T)
+    (("" (SKOLETIN)
+      (("" (TYPEPRED "l")
+        (("" (FLATTEN)
+          (("" (SKOLEM -1 "found_i")
+            (("" (FLATTEN)
+              (("" (EXPAND "length" -1 1)
+                (("" (ASSERT)
+                  (("" (HIDE -3)
+                    (("" (MOVE-TERMS -1 R 2)
+                      (("" (ASSERT)
+                        (("" (EXPAND "injective_dict?" 1)
+                          (("" (SKEEP :PREDS? T)
+                            (("" (REWRITE "length_snoc")
+                              (("" (ASSERT)
+                                (("" (HIDE -9)
+                                  (("" (EXPAND "snoc")
+                                    (("" (REWRITE "nth_append")
+                                      (("" (REWRITE "nth_append")
+                                        (("" (CASE-REPLACE "length(jdict) = j")
+                                          (("1" (ASSERT)
+                                            (("1" (EXPAND "nth" -9 2)
+                                              (("1" (INST -6 "i") NIL NIL))
+                                              NIL))
+                                            NIL)
+                                           ("2" (ASSERT)
+                                            (("2"
+                                              (LEMMA "injective_dict[JValue]")
+                                              (("2" (INST -1 "jdict")
+                                                (("2" (ASSERT)
+                                                  (("2" (INSTEEP)
+                                                    (("2" (ASSERT) NIL NIL))
+                                                    NIL))
+                                                  NIL))
+                                                NIL))
+                                              NIL))
+                                            NIL))
+                                          NIL))
+                                        NIL))
+                                      NIL))
+                                    NIL))
+                                  NIL))
+                                NIL))
+                              NIL))
+                            NIL))
+                          NIL))
+                        NIL))
+                      NIL))
+                    NIL))
+                  NIL))
+                NIL))
+              NIL))
+            NIL))
+          NIL))
+        NIL))
+      NIL))
+    NIL)
+   ((|injective_null| NAME-JUDGEMENT "(injective_dict?[T])" |json_def| NIL)
+    (|real_ge_is_total_order| NAME-JUDGEMENT "(total_order?[real])"
+     |real_props| NIL)
+    (|injective_dict| FORMULA-DECL NIL |json_def| NIL)
+    (|int_plus_int_is_int| APPLICATION-JUDGEMENT "int" |integers| NIL)
+    (|length_singleton| FORMULA-DECL NIL |more_list_props| |structures|)
+    (|nth_append| FORMULA-DECL NIL |more_list_props| |structures|)
+    (|length_snoc| FORMULA-DECL NIL |more_list_props| |structures|)
+    (|nnint_plus_nnint_is_nnint| APPLICATION-JUDGEMENT "nonneg_int" |integers|
+     NIL)
+    (TRUE CONST-DECL "bool" |booleans| NIL)
+    (|id| CONST-DECL "(bijective?[T, T])" |identity| NIL)
+    (|bijective?| CONST-DECL "bool" |functions| NIL)
+    (|bool| NONEMPTY-TYPE-EQ-DECL NIL |booleans| NIL)
+    (|boolean| NONEMPTY-TYPE-DECL NIL |booleans| NIL)
+    (|JDictionary| TYPE-EQ-DECL NIL |json_def| NIL)
+    (|injective_dict?| CONST-DECL "bool" |json_def| NIL)
+    (|find| DEF-DECL "{ll: list[T] |
+   EXISTS (i: upto(length(l))):
+     length(ll) = length(l) - i AND
+      (FORALL (k: below(i)): NOT test(nth(l, k))) AND
+       (cons?(ll) IMPLIES test(car(ll))) AND
+        (FORALL (k: subrange(i, length(l) - 1)):
+           nth(l, k) = nth(ll, k - i))}"
+     |list_lemmas| |structures|)
+    (|subrange| TYPE-EQ-DECL NIL |integers| NIL)
+    (|car| ADT-ACCESSOR-DECL "[(cons?) -> T]" |list_adt| NIL)
+    (|cons?| ADT-RECOGNIZER-DECL "[list -> boolean]" |list_adt| NIL)
+    (IMPLIES CONST-DECL "[bool, bool -> bool]" |booleans| NIL)
+    (|nth| DEF-DECL "T" |list_props| NIL)
+    (NOT CONST-DECL "[bool -> bool]" |booleans| NIL)
+    (|below| TYPE-EQ-DECL NIL |naturalnumbers| NIL)
+    (< CONST-DECL "bool" |reals| NIL)
+    (- CONST-DECL "[numfield, numfield -> numfield]" |number_fields| NIL)
+    (|numfield| NONEMPTY-TYPE-EQ-DECL NIL |number_fields| NIL)
+    (AND CONST-DECL "[bool, bool -> bool]" |booleans| NIL)
+    (|upto| NONEMPTY-TYPE-EQ-DECL NIL |naturalnumbers| NIL)
+    (|length| DEF-DECL "nat" |list_props| NIL)
+    (<= CONST-DECL "bool" |reals| NIL) (>= CONST-DECL "bool" |reals| NIL)
+    (|int| NONEMPTY-TYPE-EQ-DECL NIL |integers| NIL)
+    (|integer_pred| CONST-DECL "[rational -> boolean]" |integers| NIL)
+    (|rational| NONEMPTY-TYPE-FROM-DECL NIL |rationals| NIL)
+    (|rational_pred| CONST-DECL "[real -> boolean]" |rationals| NIL)
+    (|real| NONEMPTY-TYPE-FROM-DECL NIL |reals| NIL)
+    (|real_pred| CONST-DECL "[number_field -> boolean]" |reals| NIL)
+    (|number_field| NONEMPTY-TYPE-FROM-DECL NIL |number_fields| NIL)
+    (|number_field_pred| CONST-DECL "[number -> boolean]" |number_fields| NIL)
+    (|number| NONEMPTY-TYPE-DECL NIL |numbers| NIL)
+    (PRED TYPE-EQ-DECL NIL |defined_types| NIL)
+    (= CONST-DECL "[T, T -> boolean]" |equalities| NIL)
+    (|list| TYPE-DECL NIL |list_adt| NIL)
+    (|JValue| TYPE-DECL NIL |json_def| NIL)
+    (|string| TYPE-EQ-DECL NIL |strings| NIL)
+    (|char| TYPE-EQ-DECL NIL |strings| NIL)
+    (|char?| ADT-RECOGNIZER-DECL "[character -> boolean]" |character_adt| NIL)
+    (|character| TYPE-DECL NIL |character_adt| NIL)
+    (|below| TYPE-EQ-DECL NIL |nat_types| NIL)
+    (|nat| NONEMPTY-TYPE-EQ-DECL NIL |naturalnumbers| NIL)
+    (IFF CONST-DECL "[bool, bool -> bool]" |booleans| NIL)
+    (|int_minus_int_is_int| APPLICATION-JUDGEMENT "int" |integers| NIL)
+    (|snoc| CONST-DECL "list[T]" |more_list_props| |structures|)
+    (|null?| ADT-RECOGNIZER-DECL "[list -> boolean]" |list_adt| NIL)
+    (|real_lt_is_strict_total_order| NAME-JUDGEMENT
+     "(strict_total_order?[real])" |real_props| NIL)
+    (|append| DEF-DECL "list[T]" |list_props| NIL)
+    (|cons| ADT-CONSTRUCTOR-DECL "[[T, list] -> (cons?)]" |list_adt| NIL)
+    (+ CONST-DECL "[numfield, numfield -> numfield]" |number_fields| NIL)
+    (|real_le_is_total_order| NAME-JUDGEMENT "(total_order?[real])"
+     |real_props| NIL)
+    (|minus_nzint_is_nzint| APPLICATION-JUDGEMENT "nzint" |integers| NIL)
+    (|posint_plus_nnint_is_posint| APPLICATION-JUDGEMENT "posint" |integers|
+     NIL)
+    (/= CONST-DECL "boolean" |notequal| NIL))
+   SHOSTAK)))
+
